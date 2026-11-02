@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+/* Brand palette. The only place colours are written as hex. Dark is the default theme. */
+:root {
+  --void: #0a1612;
+  --ink: #141c1e;
+  --teal: #1a3b3c;
+  --pine: #2b5f43;
+  --accent-hi: #73ef97;
+  --highlight: #87f4a6;
+
+  --bg: #0a1612;
+  --surface: #12221d;
+  --surface-2: #1b3029;
+  --line: #22392f;
+  --muted: #387d57;
+  --text: #e8fbee;
+  --text-2: #b8dcc6;
+  --accent: #69de8a;
+  --accent-ink: #141c1e;
+  --accent-deep: #69de8a;
+
+  /* Risk levels. */
+  --ok: #87f4a6;
+  --warn: #f2c66d;
+  --bad: #e3a48c;
+  --none: #6f8a7d;
+
+  --radius-card: 16px;
+  --radius-well: 12px;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f6f9f4;
+    --surface: #ffffff;
+    --surface-2: #eef3ee;
+    --line: #dde5df;
+    --muted: #4a7a5e;
+    --text: #0a1612;
+    --text-2: #4f6a5b;
+    --accent-deep: #1f6b42;
+    --ok: #1f6b42;
+    --warn: #8a5a00;
+    --bad: #7a3b22;
+    --none: #5d6f66;
+    color-scheme: light;
+  }
+}
+
+@theme inline {
+  --color-void: var(--void);
+  --color-ink: var(--ink);
+  --color-teal: var(--teal);
+  --color-pine: var(--pine);
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-muted: var(--muted);
+  --color-text: var(--text);
+  --color-text-2: var(--text-2);
+  --color-accent: var(--accent);
+  --color-accent-hi: var(--accent-hi);
+  --color-accent-ink: var(--accent-ink);
+  --color-accent-deep: var(--accent-deep);
+  --color-highlight: var(--highlight);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-bad: var(--bad);
+  --color-none: var(--none);
+
+  --font-display: var(--font-bowlby), system-ui, sans-serif;
+  --font-sans: var(--font-rubik), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
+
+  --radius-card: var(--radius-card);
+  --radius-well: var(--radius-well);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--highlight);
+  outline-offset: 2px;
+}
