@@ -1,8 +1,9 @@
-import { RPC_URL } from "./config";
+import { RPC_URLS } from "./config";
 
 /**
  * Minimal NEAR JSON-RPC client over fetch. Works on the server and in the browser.
- * Retries rate limits and gateway errors with backoff; anything else fails fast.
+ * On a rate limit or gateway error it moves to the next endpoint in RPC_URLS, with backoff;
+ * anything else fails fast.
  */
 
 export class RpcError extends Error {
@@ -17,22 +18,35 @@ export class RpcError extends Error {
   }
 }
 
-const RETRY_STATUS = new Set([408, 429, 500, 502, 503, 504]);
+const RETRY_STATUS = new Set([408, 410, 429, 500, 502, 503, 504]);
+
+/** Index into RPC_URLS of the endpoint to try first; moves past one that rate-limits, back after a minute. */
+let preferred = 0;
+let preferredAt = 0;
+
+function authFor(url: string): Record<string, string> {
+  const key = typeof process !== "undefined" ? process.env.FASTNEAR_API_KEY : undefined;
+  return key && url.includes("fastnear.com") ? { authorization: `Bearer ${key}` } : {};
+}
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Finality = { finality: "final" | "optimistic" } | { block_id: number | string };
 
 export async function rpc<T>(method: string, params: unknown, opts: { url?: string; attempts?: number } = {}): Promise<T> {
-  const url = opts.url ?? RPC_URL;
-  const attempts = opts.attempts ?? 4;
+  const urls = opts.url ? [opts.url] : RPC_URLS;
+  const attempts = opts.attempts ?? Math.max(4, urls.length + 1);
+  if (preferred && Date.now() - preferredAt > 60_000) preferred = 0;
+  const start = opts.url ? 0 : preferred;
   let last: unknown;
   for (let i = 0; i < attempts; i++) {
-    if (i > 0) await sleep(250 * 2 ** (i - 1) + Math.random() * 150);
+    if (i >= urls.length) await sleep(400 * 2 ** (i - urls.length) + Math.random() * 200);
+    const at = (start + i) % urls.length;
+    const url = urls[at]!;
     let res: Response;
     try {
       res = await fetch(url, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...authFor(url) },
         body: JSON.stringify({ jsonrpc: "2.0", id: "vana", method, params }),
         signal: AbortSignal.timeout(15_000),
       });
@@ -41,7 +55,12 @@ export async function rpc<T>(method: string, params: unknown, opts: { url?: stri
       continue;
     }
     if (RETRY_STATUS.has(res.status)) {
-      last = new RpcError(`RPC ${res.status}`);
+      last = new RpcError(`RPC ${res.status} from ${new URL(url).host}`);
+      // stick with the next endpoint for a while instead of hitting the limited one again
+      if (res.status === 429 && !opts.url) {
+        preferred = (at + 1) % urls.length;
+        preferredAt = Date.now();
+      }
       continue;
     }
     const body = (await res.json().catch(() => null)) as
