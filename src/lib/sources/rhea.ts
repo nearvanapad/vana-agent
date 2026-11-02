@@ -169,6 +169,12 @@ export async function poolsFor(token: string, knownDcl: string[] = []): Promise<
   return { ...sourced(fresh, "Rhea", `${APP}/pools`), partial: !idx };
 }
 
+/** How many live Rhea pools hold `token`, from the index; null when the index can't be built. */
+export async function poolCount(token: string): Promise<number | null> {
+  const idx = await poolIndex().catch(() => null);
+  return idx ? (idx.by_token[token]?.length ?? 0) : null;
+}
+
 export type Price = { price: number; symbol: string; decimals: number };
 
 /** USD price of every token Rhea lists. Kept for 5 minutes. */

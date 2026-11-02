@@ -1,0 +1,43 @@
+import { z } from "zod";
+import { challenge, SignInError, verifySignIn } from "@/lib/auth/nep413";
+import { ensureSession, readSession, signIn, signOut } from "@/lib/auth/session";
+
+/** Who the browser is: a guest, or a wallet account signed in with NEP-413. */
+export async function GET() {
+  const s = await ensureSession();
+  return Response.json({ account: s.account });
+}
+
+const Body = z.discriminatedUnion("step", [
+  z.object({ step: z.literal("challenge") }),
+  z.object({
+    step: z.literal("verify"),
+    accountId: z.string().min(2).max(64),
+    publicKey: z.string().max(128),
+    signature: z.string().max(256),
+    nonce: z.string().max(64),
+  }),
+]);
+
+/** The NEP-413 recipient: the host the user sees, so a signature for another site can't be replayed here. */
+const recipientOf = (req: Request) => req.headers.get("x-forwarded-host") ?? req.headers.get("host") ?? "vana";
+
+export async function POST(req: Request) {
+  const body = Body.safeParse(await req.json().catch(() => null));
+  if (!body.success) return Response.json({ error: "Bad request." }, { status: 400 });
+  const s = await ensureSession();
+  if (body.data.step === "challenge") return Response.json(challenge(recipientOf(req)));
+  try {
+    const account = await verifySignIn(body.data, recipientOf(req));
+    return Response.json({ account: signIn(s, account).account });
+  } catch (e) {
+    const msg = e instanceof SignInError ? e.message : "Sign-in failed. Try again.";
+    return Response.json({ error: msg }, { status: 401 });
+  }
+}
+
+export async function DELETE() {
+  const s = await readSession();
+  if (s) signOut(s);
+  return Response.json({ account: null });
+}

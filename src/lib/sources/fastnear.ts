@@ -18,3 +18,13 @@ export async function topHolders(token: string): Promise<Sourced<Holder[]>> {
     .sort((a, b) => (BigInt(b.amount) > BigInt(a.amount) ? 1 : -1));
   return sourced(list, "FastNEAR", `https://nearblocks.io/token/${token}?tab=holders`);
 }
+
+/** Every token an account has touched, with its raw balance. */
+export async function accountTokens(account: string): Promise<Sourced<{ token: string; amount: string }[]>> {
+  const url = `${API}/account/${encodeURIComponent(account)}/ft`;
+  const r = await getJson<{ tokens: { contract_id: string; balance: string | null }[] }>(url, { headers: headers() });
+  const list = r.tokens
+    .filter((t) => t.balance && /^\d+$/.test(t.balance) && t.balance !== "0")
+    .map((t) => ({ token: t.contract_id, amount: t.balance! }));
+  return sourced(list, "FastNEAR", `https://nearblocks.io/address/${account}?tab=tokens`);
+}

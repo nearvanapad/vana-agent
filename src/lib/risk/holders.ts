@@ -1,5 +1,5 @@
 import * as fastnear from "../sources/fastnear";
-import type { SourceRef } from "../sources/http";
+import { refOf, type SourceRef } from "../sources/http";
 import * as nearblocks from "../sources/nearblocks";
 import { CLASSIC, DCL } from "../sources/rhea";
 import { isLaunchpadInfra } from "./launchpad";
@@ -28,18 +28,18 @@ export async function holdersCheck(info: TokenInfo): Promise<Check> {
   try {
     const r = await fastnear.topHolders(info.token);
     list = r.data;
-    sources.push(r);
+    sources.push(refOf(r));
   } catch {
     const r = await nearblocks.holders(info.token, 25);
     list = r.data;
-    sources.push(r);
+    sources.push(refOf(r));
   }
   // NearBlocks reports 0 for tokens it has not indexed yet: treat that as unknown
   const count = await nearblocks
     .holderCount(info.token)
     .then((c) => (c.data > 0 ? c : null))
     .catch(() => null);
-  if (count) sources.push(count);
+  if (count) sources.push(refOf(count));
 
   const supply = BigInt(info.total_supply);
   const dev = info.dev?.account ?? null;

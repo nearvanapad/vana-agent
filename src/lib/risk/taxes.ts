@@ -1,6 +1,6 @@
 import { EXPLORER_ACCOUNT } from "../near/config";
 import { tryView } from "../near/rpc";
-import { ref, type SourceRef } from "../sources/http";
+import { ref, refOf, type SourceRef } from "../sources/http";
 import type { Pool } from "../sources/rhea";
 import { powers, type ContractFacts } from "./contract";
 import { byLevel, fmtPct, tax, TAX_RED_PCT, TAX_YELLOW_PCT, worst } from "./rules";
@@ -26,7 +26,7 @@ export async function taxesCheck(info: TokenInfo, f: ContractFacts, pools: Pool[
   const lp = info.launchpad;
   if (lp && lp.buy_tax_pct !== null && lp.sell_tax_pct !== null) {
     rate = { buy: lp.buy_tax_pct, sell: lp.sell_tax_pct, from: `${lp.platform} launchpad` };
-    sources.push(lp.source);
+    sources.push(refOf(lp.source));
   } else {
     const t = await tokenTax(f);
     if (t) {

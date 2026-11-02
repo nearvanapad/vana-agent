@@ -20,8 +20,11 @@ export type ContractFacts = {
 };
 
 export class TokenNotFound extends Error {
-  constructor(readonly token: string) {
-    super(`${token} does not exist on NEAR mainnet`);
+  constructor(
+    readonly token: string,
+    why = "does not exist on NEAR mainnet",
+  ) {
+    super(`${token} ${why}. If that was a symbol, search for its contract first.`);
     this.name = "TokenNotFound";
   }
 }
@@ -57,10 +60,13 @@ export async function loadContract(token: string): Promise<ContractFacts> {
     throw e;
   }
   const hash = contractHash(account);
+  if (!hash) throw new TokenNotFound(token, "is a plain account with no contract, so it is not a token");
   const [keys, methods] = await Promise.all([
     viewAccessKeys(token),
-    hash ? viewCode(token).then((c) => wasmExports(decodeBase64(c.code_base64))) : Promise.resolve([] as string[]),
+    viewCode(token).then((c) => wasmExports(decodeBase64(c.code_base64))),
   ]);
+
+  if (methods.length && !methods.includes("ft_metadata")) throw new TokenNotFound(token, "is a contract but not a NEP-141 token (no ft_metadata)");
 
   let owner: ContractFacts["owner"] = null;
   for (const m of OWNER_VIEWS.filter((m) => methods.includes(m))) {

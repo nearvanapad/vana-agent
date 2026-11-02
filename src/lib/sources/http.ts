@@ -18,6 +18,9 @@ export function ref(source: string, url: string, asOf = new Date()): SourceRef {
   return { source, url, as_of: asOf.toISOString() };
 }
 
+/** Just the citation of a sourced value, without its data. */
+export const refOf = (s: SourceRef): SourceRef => ({ source: s.source, url: s.url, as_of: s.as_of });
+
 export function sourced<T>(data: T, source: string, url: string, asOf = new Date()): Sourced<T> {
   return { data, source, url, as_of: asOf.toISOString() };
 }

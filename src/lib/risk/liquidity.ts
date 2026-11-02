@@ -1,6 +1,6 @@
 import { EXPLORER_ACCOUNT } from "../near/config";
 import { viewAccessKeys } from "../near/rpc";
-import { ref, type SourceRef, type Sourced } from "../sources/http";
+import { ref, refOf, type SourceRef, type Sourced } from "../sources/http";
 import { poolShares, positionOwner, prices, type Pool } from "../sources/rhea";
 import { isLaunchpadInfra } from "./launchpad";
 import { byLevel, DEV_LP_RED_PCT, fmtPct, fmtUsd, LIQUIDITY_THIN_USD, pct, units, worst } from "./rules";
@@ -81,7 +81,7 @@ export async function liquidityCheck(info: TokenInfo, pools: Sourced<Pool[]> & {
   }
 
   const { depths, priced } = await poolDepths(info.token, info.symbol, live);
-  sources.push(priced);
+  sources.push(refOf(priced));
   const knownDepth = depths.filter((d) => d.other_side_usd !== null);
   const total = round(knownDepth.reduce((s, d) => s + (d.other_side_usd ?? 0), 0));
   const best = depths[0]!;
