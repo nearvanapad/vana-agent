@@ -2,7 +2,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { clsx } from "clsx";
-import { ArrowLeftRight, GripVertical, PanelRight, PictureInPicture2, ShieldCheck, X } from "lucide-react";
+import { ArrowLeftRight, GripVertical, MessageSquare, PanelRight, PictureInPicture2, ShieldCheck, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { CheckTab } from "./check-tab";
 import { usePane, type Tab } from "./pane-context";
@@ -36,7 +36,9 @@ function Body({ title, mode, grab }: { title: React.ReactNode; mode: Mode; grab?
       >
         {title}
         {grab && <GripVertical size={14} className="-mr-1 shrink-0 text-text-2/60" aria-hidden />}
-        <div role="tablist" className="flex gap-1">
+        {/* Phones switch tools from the tab bar, so the header just names this one. */}
+        <span className="px-1 text-sm font-semibold md:hidden">{TABS.find((t) => t.id === pane.tab)?.label}</span>
+        <div role="tablist" className="flex gap-1 max-md:hidden">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
@@ -181,11 +183,18 @@ export function PaneOverlay() {
   if (mode === "float") return <Floating />;
   if (pane.docked) return null;
   return (
-    <Dialog.Root open={mode === "drawer"} onOpenChange={(o) => pane.dispatch(o ? { t: "open" } : { t: "close" })}>
+    // Not modal, so the header and the tab bar stay usable while it is open.
+    <Dialog.Root modal={false} open={mode === "drawer"} onOpenChange={(o) => pane.dispatch(o ? { t: "open" } : { t: "close" })}>
       <Dialog.Portal>
-        {/* Under the header, so the wallet button and menu stay in view. */}
-        <Dialog.Overlay className="fixed inset-x-0 bottom-0 top-15 z-40 bg-void/70" />
-        <Dialog.Content className="fixed bottom-0 right-0 top-15 z-50 w-full overflow-y-auto rounded-t-card border-x border-t border-line bg-bg sm:w-[480px]">
+        {/* Between the header and the tab bar, so both stay in view. */}
+        <div className={clsx("fixed inset-x-0 top-15 z-40 bg-void/70", BOTTOM)} aria-hidden />
+        <Dialog.Content
+          onInteractOutside={(e) => {
+            // The tab bar switches the drawer's tab itself.
+            if ((e.detail.originalEvent.target as Element | null)?.closest("[data-tab-bar]")) e.preventDefault();
+          }}
+          className={clsx("fixed right-0 top-15 z-50 w-full overflow-y-auto rounded-t-card border-x border-t border-line bg-bg sm:w-[480px]", BOTTOM)}
+        >
           <Dialog.Description className="sr-only">Token checks and swaps</Dialog.Description>
           <Body title={<Dialog.Title className="sr-only">Side pane</Dialog.Title>} mode="drawer" />
         </Dialog.Content>
@@ -194,11 +203,39 @@ export function PaneOverlay() {
   );
 }
 
-/** The buttons above the chat box that open the pane on a tool, or close it. */
+/** Clears the tab bar on phones; reaches the bottom where there is none. */
+const BOTTOM = "bottom-[calc(3.5rem+env(safe-area-inset-bottom))] md:bottom-0";
+
+/** On phones, a tab bar at the foot of the screen: the chat, or the pane on one of its tools. */
+export function PaneTabBar() {
+  const pane = usePane();
+  const items = [{ id: "chat" as const, label: "Chat", icon: MessageSquare }, ...TABS];
+  return (
+    <nav data-tab-bar aria-label="Sections" className="grid shrink-0 grid-cols-3 border-t border-line bg-bg pb-[env(safe-area-inset-bottom)] md:hidden">
+      {items.map(({ id, label, icon: Icon }) => {
+        const on = id === "chat" ? !pane.open : pane.open && pane.tab === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => pane.dispatch(id === "chat" ? { t: "close" } : { t: "open", tab: id })}
+            aria-current={on ? "page" : undefined}
+            className={clsx("flex h-14 flex-col items-center justify-center gap-0.5 text-[0.7rem]", on ? "text-accent" : "text-text-2")}
+          >
+            <Icon size={20} strokeWidth={on ? 2.25 : 1.75} />
+            {label}
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
+/** The buttons above the chat box that open the pane on a tool, or close it. Phones use the tab bar instead. */
 export function PaneToggles() {
   const pane = usePane();
   return (
-    <div className="mb-2 flex gap-2">
+    <div className="mb-2 hidden gap-2 md:flex">
       {TABS.map(({ id, label, icon: Icon }) => {
         const on = pane.open && pane.tab === id;
         return (

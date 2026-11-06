@@ -132,7 +132,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
         </div>
         <PaneInline />
       </div>
-      <div className="shrink-0 px-4 pb-4 pt-2">
+      <div className="shrink-0 px-4 pb-3 pt-2 md:pb-4">
         <div className={clsx("mx-auto", !inline && "max-w-3xl")}>
           <PaneToggles />
           <Composer busy={busy} disabled={!ready} think={think} onThink={setThink} onSend={send}

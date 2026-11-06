@@ -9,7 +9,7 @@ import { useSession } from "@/components/session/use-session";
 import { ConnectButton } from "@/components/wallet/connect-button";
 import Image from "next/image";
 import { PaneProvider } from "@/components/pane/pane-context";
-import { PaneOverlay } from "@/components/pane/pane";
+import { PaneOverlay, PaneTabBar } from "@/components/pane/pane";
 import { ChatView } from "./chat-view";
 import { ConversationList, type ConversationItem } from "./conversation-list";
 import vana from "./vana.gif";
@@ -188,6 +188,7 @@ export function ChatApp() {
               onSend={onFirstSend}
             />
           )}
+          <PaneTabBar />
         </main>
         <PaneOverlay />
       </div>

@@ -117,7 +117,8 @@ export function TokenPicker({ value, onChange, label, typing }: { value: string;
         <Popover.Content
           align="end"
           sideOffset={6}
-          collisionPadding={8}
+          // Phones have a tab bar at the foot of the screen: stay above it.
+          collisionPadding={{ top: 8, left: 8, right: 8, bottom: innerWidth < 768 ? 64 : 8 }}
           aria-label={label}
           className="z-[70] flex max-h-[min(560px,var(--radix-popover-content-available-height))] w-[max(var(--radix-popover-trigger-width),320px)] max-w-[calc(100vw-16px)] flex-col rounded-card border border-line bg-bg shadow-2xl shadow-void/60"
           onOpenAutoFocus={(e) => {
