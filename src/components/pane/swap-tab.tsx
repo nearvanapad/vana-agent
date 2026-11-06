@@ -3,6 +3,7 @@
 import { clsx } from "clsx";
 import { AlertTriangle, ArrowDownUp, Loader2, Wallet } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { networkOf, WALLET } from "@/lib/near/network";
 import { useSession } from "../session/use-session";
 import { QuoteCard, SwapCard } from "../chat/swap-card";
 import { usePane, type ProposalItem, type QuoteItem, type SwapForm } from "./pane-context";
@@ -58,7 +59,8 @@ export function SwapTab() {
 
   const amountOk = /^\d*\.?\d+$/.test(form.amount) && Number(form.amount) > 0;
   const ready = form.from.trim().length >= 2 && form.to.trim().length >= 2 && amountOk;
-  const testnet = /\.testnet$/.test(form.to.trim()) || /\.testnet$/.test(form.from.trim());
+  // Swaps run on the wallet's network; a token from the other one can only be checked.
+  const off = [form.from, form.to].map((t) => t.trim()).find((t) => t.includes(".") && networkOf(t).id !== WALLET.id);
   const input = { from: form.from.trim(), to: form.to.trim(), amount: form.amount.trim(), slippage_pct: form.slippage };
   const signedIn = Boolean(session.account);
 
@@ -82,7 +84,7 @@ export function SwapTab() {
             <ArrowDownUp size={14} />
           </button>
         </div>
-        <Field label="You get" hint="Contract id, e.g. usdt.tether-token.near">
+        <Field label="You get" hint={WALLET.id === "testnet" ? "Testnet contract, e.g. a nearvana token" : "Contract id, e.g. usdt.tether-token.near"}>
           <input value={v("to")} onChange={(e) => set({ to: e.target.value })} placeholder="token contract" aria-label="Receive" spellCheck={false} autoCapitalize="none" className={clsx(INPUT, "w-full")} />
         </Field>
         <div className="flex items-center justify-between gap-2 pt-1">
@@ -101,18 +103,19 @@ export function SwapTab() {
             ))}
           </div>
         </div>
-        {testnet && (
+        {off && (
           <p className="flex items-start gap-2 text-xs text-warn">
-            <AlertTriangle size={13} className="mt-0.5 shrink-0" /> Swaps are mainnet only. Testnet tokens can be checked, not swapped here.
+            <AlertTriangle size={13} className="mt-0.5 shrink-0" /> Swaps run on NEAR {WALLET.id} here. {off} is a {networkOf(off).id} token: it can be checked, not swapped.
           </p>
         )}
+        {!off && WALLET.id === "testnet" && <p className="text-xs text-text-2">Testnet swap through Rhea&apos;s testnet pools, signed by your testnet wallet.</p>}
         <div className="grid grid-cols-2 gap-2 pt-1">
-          <button type="submit" disabled={!ready || testnet} className="rounded-well border border-line px-3 py-2 text-sm hover:bg-surface-2 disabled:opacity-40">
+          <button type="submit" disabled={!ready || Boolean(off)} className="rounded-well border border-line px-3 py-2 text-sm hover:bg-surface-2 disabled:opacity-40">
             Get quote
           </button>
           <button
             type="button"
-            disabled={!ready || testnet || !signedIn}
+            disabled={!ready || Boolean(off) || !signedIn}
             onClick={() => pane.propose(input)}
             title={signedIn ? "Checks the token bought, then shows the approval card" : "Sign in with your wallet to swap"}
             className="flex items-center justify-center gap-1.5 rounded-well bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-40"

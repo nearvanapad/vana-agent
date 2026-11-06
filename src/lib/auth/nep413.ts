@@ -1,5 +1,7 @@
 import { createHash, createPublicKey, randomBytes, verify } from "node:crypto";
 import { kv } from "../db";
+import { WALLET } from "../near/network";
+import { onNetwork } from "../near/network-server";
 import { viewAccessKeys } from "../near/rpc";
 
 /**
@@ -44,7 +46,8 @@ export async function verifySignIn(s: SignedMessage, recipient: string): Promise
   if (!ok) throw new SignInError("The signature does not match.");
 
   const account = s.accountId.trim().toLowerCase();
-  const keys = await viewAccessKeys(account).catch(() => []);
+  // The wallet signs on one network: its keys are read there.
+  const keys = await onNetwork(WALLET, () => viewAccessKeys(account)).catch(() => []);
   const full = keys.some((k) => k.public_key === s.publicKey && k.access_key.permission === "FullAccess");
   if (!full) throw new SignInError(`That key is not a full-access key of ${account}.`);
   return account;

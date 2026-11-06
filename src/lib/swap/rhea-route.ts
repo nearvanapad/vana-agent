@@ -1,6 +1,6 @@
 import { tryView } from "../near/rpc";
 import { mapLimit } from "../sources/http";
-import { DCL, poolsFor, type Pool } from "../sources/rhea";
+import { dcl, poolsFor, type Pool } from "../sources/rhea";
 import { WNEAR } from "./assets";
 
 /**
@@ -20,7 +20,7 @@ async function dclPools(token: string): Promise<Pool[]> {
 
 /** Output of `amount` through `pool_ids`, or null when the path can't fill it. */
 export async function quotePath(pool_ids: string[], input: string, output: string, amount: bigint): Promise<bigint | null> {
-  const r = await tryView<{ amount: string }>(DCL, "quote", {
+  const r = await tryView<{ amount: string }>(dcl(), "quote", {
     pool_ids,
     input_token: input,
     output_token: output,

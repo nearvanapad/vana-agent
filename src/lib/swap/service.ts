@@ -1,13 +1,15 @@
 import { randomBytes } from "node:crypto";
 import { getDb } from "../db";
 import { EXPLORER_TX, YOCTO } from "../near/config";
+import { WALLET } from "../near/network";
+import { onNetwork } from "../near/network-server";
 import { tryView, txStatus, viewAccount } from "../near/rpc";
 import { ftTransfer, ftTransferCall, nearDeposit, storageDeposit, type FunctionCallAction, type WalletTx } from "../near/tx";
 import { riskReport } from "../risk/report";
 import type { Level } from "../risk/types";
 import { ref, type SourceRef } from "../sources/http";
 import * as oneclick from "../sources/oneclick";
-import { DCL, dclPoolUrl } from "../sources/rhea";
+import { dcl, dclPoolUrl } from "../sources/rhea";
 import { fromRaw, resolveAsset, SwapError, toRaw, WNEAR, type Asset } from "./assets";
 import { bestRoute, quotePath, swapMsg } from "./rhea-route";
 
@@ -148,7 +150,12 @@ function intentsError(e: unknown): SwapError {
 }
 
 /** A price for the swap. Nothing is stored and nothing can be signed from it. */
-export async function quoteSwap(input: SwapInput, account: string | null): Promise<SwapQuote> {
+export function quoteSwap(input: SwapInput, account: string | null): Promise<SwapQuote> {
+  // Swaps run on the wallet's network.
+  return onNetwork(WALLET, () => quoteSwapOn(input, account));
+}
+
+async function quoteSwapOn(input: SwapInput, account: string | null): Promise<SwapQuote> {
   return priced(await resolve(input, account), account);
 }
 
@@ -231,7 +238,12 @@ async function ftBalance(token: string, account: string): Promise<bigint> {
  * Prices the swap for the signed-in `account`, runs the risk check on what they'd buy, and stores
  * the proposal so approval uses exactly what the card showed.
  */
-export async function proposeSwap(input: SwapInput, account: string, conversationId: string | null): Promise<Proposal> {
+export function proposeSwap(input: SwapInput, account: string, conversationId: string | null): Promise<Proposal> {
+  // Swaps run on the wallet's network.
+  return onNetwork(WALLET, () => proposeSwapOn(input, account, conversationId));
+}
+
+async function proposeSwapOn(input: SwapInput, account: string, conversationId: string | null): Promise<Proposal> {
   const r = await resolve(input, account);
   const have = await spendable(r.from, account);
   if (have < r.raw) {
@@ -350,7 +362,7 @@ async function buildTxs(row: Row, r: Resolved, payTo: { depositAddress: string }
     if (reg) actions.push(reg);
     actions.push(ftTransfer(payTo.depositAddress, r.raw.toString()));
   } else {
-    actions.push(ftTransferCall(DCL, r.raw.toString(), swapMsg(payTo.pool_ids, r.to.token!, payTo.minOut)));
+    actions.push(ftTransferCall(dcl(), r.raw.toString(), swapMsg(payTo.pool_ids, r.to.token!, payTo.minOut)));
   }
   txs.push({ receiverId: pay, actions });
   return txs;
@@ -360,7 +372,12 @@ async function buildTxs(row: Row, r: Resolved, payTo: { depositAddress: string }
  * The user pressed Approve: takes a real quote, checks it still gives at least the minimum the
  * card showed, and returns the transactions for the wallet.
  */
-export async function approveSwap(id: string, account: string): Promise<{ swap: SwapView; txs: WalletTx[] }> {
+export function approveSwap(id: string, account: string): Promise<{ swap: SwapView; txs: WalletTx[] }> {
+  // Swaps run on the wallet's network.
+  return onNetwork(WALLET, () => approveSwapOn(id, account));
+}
+
+async function approveSwapOn(id: string, account: string): Promise<{ swap: SwapView; txs: WalletTx[] }> {
   const row = load(id, account);
   if (row.status !== "proposed") throw new SwapError(`This swap is already ${row.status}.`);
   const { proposal, input } = stored(row);
@@ -403,7 +420,12 @@ export async function approveSwap(id: string, account: string): Promise<{ swap: 
 }
 
 /** The wallet signed and sent the payment. */
-export async function submitSwap(id: string, account: string, txHash: string | null): Promise<SwapView> {
+export function submitSwap(id: string, account: string, txHash: string | null): Promise<SwapView> {
+  // Swaps run on the wallet's network.
+  return onNetwork(WALLET, () => submitSwapOn(id, account, txHash));
+}
+
+async function submitSwapOn(id: string, account: string, txHash: string | null): Promise<SwapView> {
   const row = load(id, account);
   if (row.status !== "signing") throw new SwapError(`This swap is ${row.status}, not waiting for a signature.`);
   update(id, { status: "submitted", tx_hash: txHash });
@@ -427,7 +449,12 @@ const FINAL: SwapStatus[] = ["success", "refunded", "failed", "expired"];
 const REFRESH_MS = 3000;
 
 /** The swap as it stands, asking 1Click or the chain when it's in flight. */
-export async function refreshSwap(id: string, account: string): Promise<SwapView> {
+export function refreshSwap(id: string, account: string): Promise<SwapView> {
+  // Swaps run on the wallet's network.
+  return onNetwork(WALLET, () => refreshSwapOn(id, account));
+}
+
+async function refreshSwapOn(id: string, account: string): Promise<SwapView> {
   const row = load(id, account);
   if (row.status === "proposed" && Date.now() > Date.parse(stored(row).proposal.expires_at)) {
     update(id, { status: "expired" });

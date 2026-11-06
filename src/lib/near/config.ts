@@ -1,12 +1,12 @@
-import { MAINNET } from "./network";
+import { WALLET } from "./network";
 
-/** The wallet signs on mainnet only: NEAR Intents has no testnet. */
-export const NETWORK = "mainnet" as const;
+/** The network the wallet signs on: testnet unless the build says mainnet. */
+export const NETWORK = WALLET.id;
 
-export const RPC_URL = MAINNET.rpc[0]!;
+export const RPC_URL = WALLET.rpc[0]!;
 
-export const EXPLORER_TX = "https://nearblocks.io/txns/";
-export const EXPLORER_ACCOUNT = "https://nearblocks.io/address/";
+export const EXPLORER_TX = `${WALLET.explorer}/txns/`;
+export const EXPLORER_ACCOUNT = `${WALLET.explorer}/address/`;
 
 /** 1 NEAR in yocto. */
 export const YOCTO = 10n ** 24n;

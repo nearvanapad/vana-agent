@@ -1,6 +1,6 @@
 /**
  * The two NEAR networks the risk check can read. Accounts ending in `.testnet` are read from
- * testnet, everything else from mainnet. Swaps are mainnet only (NEAR Intents has no testnet).
+ * testnet, everything else from mainnet. The wallet signs, and swaps run, on one network: `WALLET`.
  *
  * Server code runs a request inside one network (see `network-server.ts`); code that runs in
  * the browser, or outside such a request, gets mainnet.
@@ -60,6 +60,12 @@ export const TESTNET: Network = {
   wrap: "wrap.testnet",
   rheaApp: "https://testnet.rhea.finance",
 };
+
+/**
+ * The network the wallet signs on and swaps run on, set at build time with NEXT_PUBLIC_NEAR_NETWORK.
+ * Testnet by default: swaps there go through Rhea's testnet pools (NEAR Intents is mainnet only).
+ */
+export const WALLET: Network = process.env.NEXT_PUBLIC_NEAR_NETWORK === "mainnet" ? MAINNET : TESTNET;
 
 /** The network an account lives on, from its name. */
 export const networkOf = (account: string): Network => (/\.testnet$/.test(account.trim().toLowerCase()) ? TESTNET : MAINNET);

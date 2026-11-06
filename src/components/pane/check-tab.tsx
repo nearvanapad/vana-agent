@@ -3,6 +3,7 @@
 import { clsx } from "clsx";
 import { AlertTriangle, ArrowLeftRight, BadgeCheck, Columns3, Loader2, MessageSquare, RefreshCw, Rocket, Search, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { networkOf, WALLET } from "@/lib/near/network";
 import { Dot, LevelPill, Mark } from "../chat/level";
 import { RiskCard, shortAccount } from "../chat/risk-card";
 import { Compare } from "./compare";
@@ -199,7 +200,7 @@ function ReportBody({ item }: { item: ReportItem }) {
         <Action onClick={() => pane.ask(`Explain the report for \`${r.token}\``)}>
           <MessageSquare size={13} /> Ask VANA about it
         </Action>
-        {!r.token.endsWith(".testnet") && (
+        {networkOf(r.token).id === WALLET.id && (
           <Action
             onClick={() => {
               pane.dispatch({ t: "form", form: { to: r.token } });

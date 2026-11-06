@@ -1,3 +1,4 @@
+import { networkOf, WALLET } from "../near/network";
 import { tryView } from "../near/rpc";
 import { swapAssets, type SwapAsset } from "../sources/oneclick";
 import { prices } from "../sources/rhea";
@@ -11,7 +12,11 @@ export class SwapError extends Error {
   }
 }
 
-export const WNEAR = "wrap.near";
+/** Wrapped NEAR on the network swaps run on. */
+export const WNEAR = WALLET.wrap;
+
+/** NEAR Intents (1Click) runs on mainnet only. */
+const INTENTS = WALLET.id === "mainnet";
 
 export type Asset = {
   /** 1Click asset id, or `nep141:<token>` for a NEAR token it doesn't list. */
@@ -32,6 +37,7 @@ export type Asset = {
 const NEAR_ACCOUNT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
 
 async function listed(): Promise<SwapAsset[] | null> {
+  if (!INTENTS) return null;
   return swapAssets()
     .then((r) => r.data)
     .catch(() => null);
@@ -48,7 +54,11 @@ async function rheaPrice(token: string): Promise<number | null> {
  */
 export async function resolveAsset(input: string): Promise<Asset> {
   const q = input.trim();
-  if (/\.testnet$/i.test(q)) throw new SwapError("Swaps run on mainnet only. Testnet tokens can be checked, not swapped.");
+  if (q.includes(".") && !q.includes(":") && networkOf(q).id !== WALLET.id) {
+    throw new SwapError(
+      `Swaps run on NEAR ${WALLET.id} here, and ${stranger(q, 64)} is a ${networkOf(q).id} token. It can be checked, not swapped.`,
+    );
+  }
   const list = await listed();
 
   if (/^w?near$/i.test(q)) {
@@ -66,6 +76,7 @@ export async function resolveAsset(input: string): Promise<Asset> {
   }
 
   if (q.includes(":")) {
+    if (!INTENTS) throw new SwapError(`Assets on other chains go through NEAR Intents, which is mainnet only; swaps here run on NEAR ${WALLET.id}.`);
     if (!list) throw new SwapError("NEAR Intents is unreachable right now, so assets on other chains can't be swapped.");
     const a = list.find((x) => x.assetId === q);
     if (!a) throw new SwapError(`${q} is not an asset NEAR Intents lists. Use list_swap_assets to find its asset_id.`);
