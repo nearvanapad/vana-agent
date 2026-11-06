@@ -34,7 +34,7 @@ const usdOf = (v: unknown) =>
   typeof v === "number" ? (v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v.toFixed(v < 10 ? 2 : 0)}`) : null;
 
 /** A check's headline numbers. Missing ones are left out, never shown as zero. */
-function rows(c: ReportView["checks"][number]): Row[] {
+export function rows(c: ReportView["checks"][number]): Row[] {
   const n = c.numbers as Record<string, unknown>;
   const pick = (list: [string, string | null][]) => list.filter((r): r is Row => r[1] !== null);
   switch (c.id) {

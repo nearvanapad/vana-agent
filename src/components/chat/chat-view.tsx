@@ -6,6 +6,9 @@ import { DefaultChatTransport, type UIMessage } from "ai";
 import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useChatSync } from "@/components/pane/chat-sync";
+import { PaneToggles } from "@/components/pane/pane";
+import { usePane } from "@/components/pane/pane-context";
 import { Composer } from "./composer";
 import vana from "./vana.gif";
 import { Message } from "./message";
@@ -45,14 +48,29 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
     onFinish: () => void qc.invalidateQueries({ queryKey: ["conversations"] }),
   });
   const busy = status === "submitted" || status === "streaming";
+  const pane = usePane();
+  useChatSync(messages);
 
   const send = (text: string) => {
     setStopped(false);
-    void sendMessage({ text }, { body: { think } });
+    void sendMessage({ text }, { body: { think, pane: pane.snapshot() } });
     props.onSend?.();
     // The conversation exists on the server once the request lands.
     setTimeout(() => void qc.invalidateQueries({ queryKey: ["conversations"] }), 800);
   };
+
+  // The pane can write to the chat (a picked candidate, "ask about this"), but not over an answer in progress.
+  const sendRef = useRef(send);
+  sendRef.current = send;
+  const busyRef = useRef(busy);
+  busyRef.current = busy;
+  const { bindAsk } = pane;
+  useEffect(() => {
+    bindAsk((text) => {
+      if (!busyRef.current) sendRef.current(text);
+    });
+    return () => bindAsk(null);
+  }, [bindAsk]);
 
   // Follow new output while the user is at the bottom.
   const bottom = useRef<HTMLDivElement>(null);
@@ -94,7 +112,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
             <span className="flex items-start gap-2">
               <AlertTriangle size={15} className="mt-0.5 shrink-0" /> {errorText(error)}
             </span>
-            <button type="button" onClick={() => void regenerate({ body: { think } })} className="flex shrink-0 items-center gap-1 hover:underline">
+            <button type="button" onClick={() => void regenerate({ body: { think, pane: pane.snapshot() } })} className="flex shrink-0 items-center gap-1 hover:underline">
               <RotateCcw size={13} /> Retry
             </button>
           </div>
@@ -102,6 +120,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
         <div ref={bottom} />
       </div>
       <div className="sticky bottom-0 bg-bg pb-4 pt-2">
+        <PaneToggles />
         <Composer busy={busy} disabled={!ready} think={think} onThink={setThink} onSend={send}
           onStop={() => {
             setStopped(true);

@@ -17,10 +17,22 @@ import { ownerOf, readSession } from "@/lib/auth/session";
 import { CONVERSATION_ID, ensureConversation, loadMessages, NotYours, saveMessages, titleFrom } from "@/lib/chat/store";
 import { allow } from "@/lib/chat/rate-limit";
 
+const Id = z.string().max(120).regex(/^[A-Za-z0-9._:-]+$/);
 const Body = z.object({
   id: z.string().regex(CONVERSATION_ID),
   message: z.object({ id: z.string().max(64), role: z.literal("user"), parts: z.array(z.unknown()).min(1).max(20) }).passthrough(),
   think: z.boolean().optional(),
+  // What the side pane shows, so "this token" can be resolved. Ids only, never free text.
+  pane: z
+    .object({
+      open: z.boolean(),
+      tab: z.enum(["check", "swap"]),
+      focus: Id.nullable(),
+      shown: z.array(Id).max(12),
+      checked: z.array(Id).max(10),
+      swap: z.object({ from: Id.or(z.literal("")), to: Id.or(z.literal("")), amount: z.string().max(40).regex(/^[\d.]*$/) }).nullable(),
+    })
+    .optional(),
 });
 
 /** Longest user message accepted, in characters. */
@@ -36,7 +48,7 @@ export async function POST(req: Request) {
 
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) return Response.json({ error: "Bad request." }, { status: 400 });
-  const { id, think } = body.data;
+  const { id, think, pane } = body.data;
   const message = body.data.message as unknown as UIMessage;
   const text = titleFrom(message);
   if (JSON.stringify(message.parts).length > MAX_INPUT * 2 || text.length === 0) {
@@ -70,7 +82,7 @@ export async function POST(req: Request) {
   const names = (Object.keys(tools) as (keyof typeof tools)[]).filter((n) => s.account || n !== "propose_swap");
   const result = streamText({
     model: chatModel(Boolean(think)),
-    instructions: instructions({ account: s.account, now: new Date(), canSwap: Boolean(s.account) }),
+    instructions: instructions({ account: s.account, now: new Date(), canSwap: Boolean(s.account), pane }),
     messages: await convertToModelMessages(messages.slice(-HISTORY), { tools, ignoreIncompleteToolCalls: true }),
     tools,
     stopWhen: isStepCount(8),

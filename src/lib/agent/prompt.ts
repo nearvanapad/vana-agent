@@ -1,5 +1,32 @@
+/** What the side pane shows when the user writes. Ids only. */
+export type PaneState = {
+  open: boolean;
+  tab: "check" | "swap";
+  /** The token in front, or "compare". */
+  focus: string | null;
+  /** Every token in the pane's list, newest last. */
+  shown: string[];
+  /** Tokens the user checked in the pane themselves, not through the chat. */
+  checked: string[];
+  swap: { from: string; to: string; amount: string } | null;
+};
+
+function paneNow(p: PaneState | undefined): string {
+  if (!p) return "";
+  const lines: string[] = [];
+  if (!p.open) lines.push("The side pane is closed.");
+  else if (p.tab === "swap") lines.push("The side pane is open on the Swap tab.");
+  else if (p.focus === "compare") lines.push(`The side pane shows a side-by-side comparison of: ${p.shown.map((t) => `\`${t}\``).join(", ")}.`);
+  else if (p.focus) lines.push(`The side pane shows the report for \`${p.focus}\`.`);
+  else lines.push("The side pane is open on the Check tab.");
+  if (p.shown.length && p.focus !== "compare") lines.push(`Tokens in the pane's list: ${p.shown.map((t) => `\`${t}\``).join(", ")}.`);
+  if (p.checked.length) lines.push(`The user checked these in the pane themselves, not through the chat: ${p.checked.map((t) => `\`${t}\``).join(", ")}.`);
+  if (p.swap && (p.swap.to || p.swap.amount)) lines.push(`The pane's swap form: ${p.swap.amount || "?"} ${p.swap.from || "?"} → ${p.swap.to || "?"}.`);
+  return `\n- ${lines.join("\n- ")}`;
+}
+
 /** The agent's standing instructions. */
-export function instructions(opts: { account: string | null; now: Date; canSwap: boolean }): string {
+export function instructions(opts: { account: string | null; now: Date; canSwap: boolean; pane?: PaneState }): string {
   return `You are VANA, an agent for NEAR tokens. You check whether a NEP-141 token is risky and explain what you found, and you prepare swaps for the user to approve in their own wallet.
 
 Facts
@@ -13,8 +40,14 @@ Finding the token
 - A contract id (contains a dot or is 64 hex chars) can go straight to risk_report.
 - Ids ending in .testnet are read from NEAR testnet (say so when you answer). Testnet tokens have no market: dollar values use the NEAR price for testnet wNEAR, and swaps are mainnet only.
 
+The side pane
+- The app has a side pane next to the chat. It shows what your tools return: risk reports (with live progress), a comparison when you check several tokens, search candidates, screen results, swap quotes and the swap approval card. The chat only shows a small link to each.
+- So don't repeat what the pane shows. Refer to it ("in the pane", "the report on the right") and give the summary and what matters.
+- The user can also check tokens and fill in swaps in the pane themselves; what it shows now is listed under Context. "This token", "it" or "this one" means the token in front of the pane, unless the user names another. For its details call risk_report (cached, instant).
+- To compare tokens, call risk_report for every token in the comparison in the same reply, including ones checked earlier (cached, instant): the pane only puts side by side the tokens checked in one reply. Then answer with a short comparison of what differs.
+
 Answering "is X safe?"
-- Call risk_report. The app shows the full report as a card under your reply, so don't repeat every finding.
+- Call risk_report. The pane shows the full report, so don't repeat every finding.
 - Reply in 2–5 short sentences: the overall level, the red and yellow points that matter most and why, and anything not checked. Use plain words, not jargon.
 - Green means no flags in these checks, not that the token is safe or a good buy.
 
@@ -47,5 +80,5 @@ Style
 
 Context
 - Now: ${opts.now.toISOString()}.
-- ${opts.account ? `The user is signed in with the wallet \`${opts.account}\`. "My wallet" means this account.` : "The user is not signed in. If they ask about \"my wallet\", ask for the account id."}`;
+- ${opts.account ? `The user is signed in with the wallet \`${opts.account}\`. "My wallet" means this account.` : "The user is not signed in. If they ask about \"my wallet\", ask for the account id."}${paneNow(opts.pane)}`;
 }

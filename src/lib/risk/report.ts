@@ -87,41 +87,61 @@ function overallSummary(r: Pick<RiskReport, "level" | "checks" | "symbol" | "tok
 }
 
 /** Quick reports skip the wallet forensics (early buyers, fresh wallets); used to screen many tokens. */
-export type ReportOpts = { fresh?: boolean; quick?: boolean };
+export type ReportOpts = { fresh?: boolean; quick?: boolean; onCheck?: (c: Check) => void };
 
-export async function buildReport(token: string, opts: { quick?: boolean } = {}): Promise<RiskReport> {
+export async function buildReport(token: string, opts: { quick?: boolean; onCheck?: (c: Check) => void } = {}): Promise<RiskReport> {
   const started = Date.now();
+  // Each check is reported as it lands, so a UI can show progress.
+  const tell = <T extends Check | null>(c: T): T => {
+    if (c) opts.onCheck?.(c);
+    return c;
+  };
   const facts = await loadContract(token);
   const info = await tokenInfo(token, facts);
+  const contract = tell(contractCheck(facts, { verified: info.verified, launchpad: info.launchpad }));
   const pools = poolsFor(token, info.launchpad?.pool_id ? [info.launchpad.pool_id] : []).catch(() => null);
   const loaded = loadHolders(token);
   const deep = !opts.quick;
 
   const [holders, early, fresh, liquidity, taxes, creator] = await Promise.all([
-    loaded.then((l) => holdersCheck(info, l)).catch((e) => failed("holders", "Holders", e)),
+    loaded
+      .then((l) => holdersCheck(info, l))
+      .then((h) => {
+        // Verified issuer tokens (stablecoins, project tokens) keep most supply in treasuries by design.
+        if (info.verified && h.level === "red") {
+          h.level = "yellow";
+          h.findings.push({ level: "green", text: "Rhea lists it as verified: issuer treasuries often hold most of the supply." });
+        }
+        return h;
+      })
+      .catch((e) => failed("holders", "Holders", e))
+      .then(tell),
     deep && !info.verified
       ? loaded
           .catch(() => ({ list: [] }))
           .then((l) => bundleCheck(info, l.list))
           .catch((e) => failed("early_buyers", "Early buyers", e))
+          .then(tell)
       : null,
     deep
-      ? loaded.then((l) => freshCheck(people(info, l.list))).catch((e) => failed("fresh_wallets", "Fresh wallets", e))
+      ? loaded
+          .then((l) => freshCheck(people(info, l.list)))
+          .catch((e) => failed("fresh_wallets", "Fresh wallets", e))
+          .then(tell)
       : null,
     pools
       .then((p) => (p ? liquidityCheck(info, p) : failed("liquidity", "Liquidity", "Rhea pools unavailable")))
-      .catch((e) => failed("liquidity", "Liquidity", e)),
-    pools.then((p) => taxesCheck(info, facts, p?.data ?? [])).catch((e) => failed("taxes", "Taxes", e)),
-    creatorCheck(info).catch((e) => failed("creator", "Creator history", e)),
+      .catch((e) => failed("liquidity", "Liquidity", e))
+      .then(tell),
+    pools
+      .then((p) => taxesCheck(info, facts, p?.data ?? []))
+      .catch((e) => failed("taxes", "Taxes", e))
+      .then(tell),
+    creatorCheck(info)
+      .catch((e) => failed("creator", "Creator history", e))
+      .then(tell),
   ]);
-  const checks = [contractCheck(facts, { verified: info.verified, launchpad: info.launchpad }), holders, early, fresh, liquidity, taxes, creator].filter(
-    (c): c is Check => c !== null,
-  );
-  // Verified issuer tokens (stablecoins, project tokens) keep most supply in treasuries by design.
-  if (info.verified && holders.level === "red") {
-    holders.level = "yellow";
-    holders.findings.push({ level: "green", text: "Rhea lists it as verified: issuer treasuries often hold most of the supply." });
-  }
+  const checks = [contract, holders, early, fresh, liquidity, taxes, creator].filter((c): c is Check => c !== null);
   const level = worst(checks.map((c) => c.level));
   const report: RiskReport = {
     ...info,
@@ -155,7 +175,7 @@ async function cachedReport(token: string, opts: ReportOpts): Promise<RiskReport
       if (hit) return { ...hit, cached: true };
     }
   }
-  const report = await buildReport(token, { quick: opts.quick });
+  const report = await buildReport(token, { quick: opts.quick, onCheck: opts.onCheck });
   if (opts.quick) {
     kv.set(`quick:${token}`, report, REPORT_TTL_MS);
     return report;

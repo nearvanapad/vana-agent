@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { Guard } from "@/lib/agent/guard";
+import { runTool } from "@/lib/agent/run-tool";
 import { buildTools } from "@/lib/agent/tools";
 import { allow } from "@/lib/chat/rate-limit";
 
@@ -49,17 +50,10 @@ function list() {
 }
 
 async function call(name: string, args: unknown) {
-  const t = tools();
   if (!(EXPOSED as readonly string[]).includes(name)) return null;
-  const def = t[name as Name] as { inputSchema: z.ZodType; execute?: (input: unknown, opts: unknown) => Promise<unknown> };
-  const parsed = def.inputSchema.safeParse(args ?? {});
-  if (!parsed.success) return { content: [{ type: "text", text: `Bad arguments: ${z.prettifyError(parsed.error)}` }], isError: true };
-  try {
-    const out = await def.execute!(parsed.data, { toolCallId: crypto.randomUUID(), messages: [], abortSignal: AbortSignal.timeout(60_000) });
-    return { content: [{ type: "text", text: JSON.stringify(out) }], structuredContent: out };
-  } catch (e) {
-    return { content: [{ type: "text", text: e instanceof Error ? e.message : String(e) }], isError: true };
-  }
+  const r = await runTool(tools()[name as Name] as never, args);
+  if (!r.ok) return { content: [{ type: "text", text: r.error }], isError: true };
+  return { content: [{ type: "text", text: JSON.stringify(r.output) }], structuredContent: r.output };
 }
 
 async function handle(m: Rpc) {

@@ -1,12 +1,14 @@
 "use client";
 
 import { AlertTriangle, Check, Loader2 } from "lucide-react";
+import type { PendingReport } from "@/lib/agent/report-stream";
+import type { TokenMatch } from "@/lib/agent/search";
 import type { ReportView } from "@/lib/agent/tools";
 import type { Proposal, SwapQuote } from "@/lib/swap/service";
 import type { SourceRef } from "@/lib/sources/http";
-import { RiskCard } from "./risk-card";
+import type { ScreenResult } from "../pane/pane-context";
+import { ProposalChip, QuoteChip, ReportChip, ScreenChip, SearchChip } from "./chips";
 import { Sources } from "./sources";
-import { QuoteCard, SwapCard } from "./swap-card";
 
 type Input = Record<string, unknown> | undefined;
 
@@ -61,6 +63,7 @@ function short(v: unknown): string {
 
 export type ToolPartLike = {
   type: string;
+  toolCallId: string;
   state: string;
   input?: unknown;
   output?: unknown;
@@ -97,19 +100,26 @@ export function ToolPart({ part }: { part: ToolPartLike }) {
   }
   if (part.state !== "output-available") return null;
 
-  if (name === "risk_report") return <RiskCard report={part.output as ReportView} />;
-  if (name === "quote_swap") return <QuoteCard quote={part.output as SwapQuote} />;
-  if (name === "propose_swap") return <SwapCard proposal={part.output as Proposal} />;
+  // The full results live in the side pane; the chat links to them.
+  const id = part.toolCallId;
+  if (name === "risk_report") return <ReportChip id={id} out={part.output as PendingReport | ReportView} />;
+  if (name === "quote_swap") return <QuoteChip id={id} out={part.output as SwapQuote} />;
+  if (name === "propose_swap") return <ProposalChip id={id} out={part.output as Proposal} />;
+  if (name === "find_tokens") return <ScreenChip id={id} out={part.output as ScreenResult} />;
+  const chip = name === "search_token" ? <SearchChip id={id} out={part.output as { matches: TokenMatch[] }} query={String(input?.query ?? "")} /> : null;
 
   return (
-    <details className="group text-sm text-text-2">
-      <summary className="flex cursor-pointer list-none items-center gap-2 hover:text-text">
-        <Check size={14} className="text-accent" />
-        {toolLabel(name, input, true)}
-      </summary>
-      <div className="mt-2 pl-6">
-        <Sources sources={sourcesOf(part.output)} />
-      </div>
-    </details>
+    <>
+      {chip}
+      <details className="group text-sm text-text-2">
+        <summary className="flex cursor-pointer list-none items-center gap-2 hover:text-text">
+          <Check size={14} className="text-accent" />
+          {toolLabel(name, input, true)}
+        </summary>
+        <div className="mt-2 pl-6">
+          <Sources sources={sourcesOf(part.output)} />
+        </div>
+      </details>
+    </>
   );
 }

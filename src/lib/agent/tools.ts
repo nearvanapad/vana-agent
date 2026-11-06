@@ -1,7 +1,7 @@
 import { explorer } from "../near/network";
 import { tool, type InferUITools } from "ai";
 import { z } from "zod";
-import { riskReport } from "../risk/report";
+import { normalizeToken, riskReport } from "../risk/report";
 import { findTokens } from "../risk/screen";
 import { units } from "../risk/rules";
 import type { Check, RiskReport } from "../risk/types";
@@ -11,6 +11,7 @@ import { prices } from "../sources/rhea";
 import { proposeSwap, quoteSwap, type Proposal, type SwapQuote } from "../swap/service";
 import { stranger, type Guard } from "./guard";
 import { walletProfile } from "./profile";
+import { reportProgress, type PendingReport } from "./report-stream";
 import { searchToken } from "./search";
 
 /**
@@ -102,10 +103,16 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
         token: tokenArg,
         fresh: z.boolean().optional().describe("Skip the 5-minute cache. Only when the user asks for fresh data."),
       }),
-      execute: async ({ token, fresh }) => {
-        const r = await riskReport(token, { fresh });
-        readStranger(guard, r);
-        return reportView(r);
+      // Streams progress (each check as it lands) to the UI; the model only sees the finished report.
+      execute: async function* ({ token, fresh }): AsyncGenerator<PendingReport | ReportView> {
+        const run = reportProgress(normalizeToken(token), { fresh });
+        let step = await run.next();
+        while (!step.done) {
+          yield step.value;
+          step = await run.next();
+        }
+        readStranger(guard, step.value);
+        yield reportView(step.value);
       },
     }),
 
