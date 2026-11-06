@@ -3,11 +3,12 @@
 import { useChat } from "@ai-sdk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport, type UIMessage } from "ai";
+import { clsx } from "clsx";
 import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useChatSync } from "@/components/pane/chat-sync";
-import { PaneToggles } from "@/components/pane/pane";
+import { PaneInline, PaneToggles, usePaneMode } from "@/components/pane/pane";
 import { usePane } from "@/components/pane/pane-context";
 import { Composer } from "./composer";
 import vana from "./vana.gif";
@@ -72,64 +73,70 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
     return () => bindAsk(null);
   }, [bindAsk]);
 
-  // Follow new output while the user is at the bottom.
-  const bottom = useRef<HTMLDivElement>(null);
-  const pinned = useRef(true);
-  useEffect(() => {
-    const onScroll = () => {
-      pinned.current = window.innerHeight + window.scrollY >= document.body.scrollHeight - 120;
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-  useEffect(() => {
-    if (pinned.current) bottom.current?.scrollIntoView({ block: "end" });
-  }, [messages]);
-
   const last = messages[messages.length - 1];
   const waiting = status === "submitted" || (status === "streaming" && last?.role === "assistant" && last.parts.every((p) => p.type === "step-start"));
 
+  // Follow new output while the user is at the bottom.
+  const scroller = useRef<HTMLDivElement>(null);
+  const pinned = useRef(true);
+  const onScroll = () => {
+    const el = scroller.current;
+    if (el) pinned.current = el.scrollTop + el.clientHeight >= el.scrollHeight - 120;
+  };
+  useEffect(() => {
+    const el = scroller.current;
+    if (el && pinned.current) el.scrollTop = el.scrollHeight;
+  }, [messages, waiting]);
+  // With the pane inside the chat, the chat box runs under both.
+  const inline = usePaneMode() === "inline";
+
   return (
-    <div className="flex flex-1 flex-col">
-      <div className="flex-1 space-y-6 py-6">
-        {messages.length === 0 ? (
-          <Empty account={account} onPick={send} disabled={!ready} />
-        ) : (
-          messages.map((m) => <Message key={m.id} message={m} />)
-        )}
-        {waiting && (
-          <div className="flex items-center gap-2 text-sm text-text-2" role="status">
-            <Loader2 size={14} className="animate-spin text-accent" /> {think ? "Thinking…" : "Working…"}
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 gap-4 px-4">
+        <div ref={scroller} onScroll={onScroll} className="min-w-0 flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-3xl space-y-6 py-6">
+            {messages.length === 0 ? (
+              <Empty account={account} onPick={send} disabled={!ready} />
+            ) : (
+              messages.map((m) => <Message key={m.id} message={m} />)
+            )}
+            {waiting && (
+              <div className="flex items-center gap-2 text-sm text-text-2" role="status">
+                <Loader2 size={14} className="animate-spin text-accent" /> {think ? "Thinking…" : "Working…"}
+              </div>
+            )}
+            {stopped && !busy && !error && (
+              <p className="text-xs text-text-2" role="status">
+                Stopped. What was written so far is kept in this chat.
+              </p>
+            )}
+            {error && (
+              <div className="flex items-start justify-between gap-3 rounded-well border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad" role="alert">
+                <span className="flex items-start gap-2">
+                  <AlertTriangle size={15} className="mt-0.5 shrink-0" /> {errorText(error)}
+                </span>
+                <button type="button" onClick={() => void regenerate({ body: { think, pane: pane.snapshot() } })} className="flex shrink-0 items-center gap-1 hover:underline">
+                  <RotateCcw size={13} /> Retry
+                </button>
+              </div>
+            )}
           </div>
-        )}
-        {stopped && !busy && !error && (
-          <p className="text-xs text-text-2" role="status">
-            Stopped. What was written so far is kept in this chat.
-          </p>
-        )}
-        {error && (
-          <div className="flex items-start justify-between gap-3 rounded-well border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad" role="alert">
-            <span className="flex items-start gap-2">
-              <AlertTriangle size={15} className="mt-0.5 shrink-0" /> {errorText(error)}
-            </span>
-            <button type="button" onClick={() => void regenerate({ body: { think, pane: pane.snapshot() } })} className="flex shrink-0 items-center gap-1 hover:underline">
-              <RotateCcw size={13} /> Retry
-            </button>
-          </div>
-        )}
-        <div ref={bottom} />
+        </div>
+        <PaneInline />
       </div>
-      <div className="sticky bottom-0 bg-bg pb-4 pt-2">
-        <PaneToggles />
-        <Composer busy={busy} disabled={!ready} think={think} onThink={setThink} onSend={send}
-          onStop={() => {
-            setStopped(true);
-            void stop();
-          }}
-        />
-        <p className="mt-2 text-center text-xs text-text-2/80">
-          Read-only checks from public chain data. Not financial advice. Your wallet signs, never the AI.
-        </p>
+      <div className="shrink-0 px-4 pb-4 pt-2">
+        <div className={clsx("mx-auto", !inline && "max-w-3xl")}>
+          <PaneToggles />
+          <Composer busy={busy} disabled={!ready} think={think} onThink={setThink} onSend={send}
+            onStop={() => {
+              setStopped(true);
+              void stop();
+            }}
+          />
+          <p className="mt-2 text-center text-xs text-text-2/80">
+            Read-only checks from public chain data. Not financial advice. Your wallet signs, never the AI.
+          </p>
+        </div>
       </div>
     </div>
   );

@@ -89,20 +89,20 @@ function reducer(s: State, a: Action): State {
   }
 }
 
-/** Wide screens dock the pane next to the chat; narrower ones show it as a drawer over the chat. */
-export function useDocked(): boolean {
-  const [docked, setDocked] = useState(false);
+function useMedia(query: string): boolean {
+  const [on, setOn] = useState(false);
   useEffect(() => {
-    const m = window.matchMedia("(min-width: 1280px)");
-    const on = () => setDocked(m.matches);
-    on();
-    m.addEventListener("change", on);
-    return () => m.removeEventListener("change", on);
-  }, []);
-  return docked;
+    const m = window.matchMedia(query);
+    const set = () => setOn(m.matches);
+    set();
+    m.addEventListener("change", set);
+    return () => m.removeEventListener("change", set);
+  }, [query]);
+  return on;
 }
 
 const OPEN_KEY = "vana:pane-open";
+const FLOAT_KEY = "vana:pane-float";
 const itemsKey = (c: string) => `vana:pane:${c}`;
 const store = {
   get<T>(k: string): T | null {
@@ -136,7 +136,13 @@ let seq = 0;
 const newId = () => `pane-${Date.now().toString(36)}-${++seq}`;
 
 type Pane = State & {
+  /** Wide enough to show the pane inside the chat, next to the messages. */
   docked: boolean;
+  /** Wide enough for the pane to float as a window the user drags around. */
+  canFloat: boolean;
+  /** The user detached the pane into a floating window. */
+  floating: boolean;
+  setFloating: (on: boolean) => void;
   dispatch: (a: Action) => void;
   toggle: (tab: Tab) => void;
   /** Checks a token, or searches when the input isn't an account id. */
@@ -164,7 +170,16 @@ export function usePane(): Pane {
 }
 
 export function PaneProvider({ conversationId, children }: { conversationId: string | null; children: ReactNode }) {
-  const docked = useDocked();
+  const docked = useMedia("(min-width: 1280px)");
+  const canFloat = useMedia("(min-width: 768px)");
+  const [floating, setFloatingState] = useState(false);
+  useEffect(() => setFloatingState(store.get<boolean>(FLOAT_KEY) ?? false), []);
+  const setFloating = useCallback((on: boolean) => {
+    setFloatingState(on);
+    store.set(FLOAT_KEY, on);
+  }, []);
+  // Where the pane is shown without covering the chat: docked or floating.
+  const beside = docked || (floating && canFloat);
   const [s, dispatch] = useReducer(reducer, null, (): State => {
     const saved = conversationId ? (store.get<Saved[]>(itemsKey(conversationId)) ?? []) : [];
     const items: PaneItem[] = saved.map((v, i) =>
@@ -175,13 +190,13 @@ export function PaneProvider({ conversationId, children }: { conversationId: str
     return { open: false, tab: "check", focus: null, swapFocus: null, compare: null, items, form: EMPTY_FORM, fill: { check: "", n: 0, swap: null, sn: 0 } };
   });
 
-  // Wide screens reopen the pane if it was open last time.
+  // Reopen the pane if it was open last time, unless it would cover the chat.
   useEffect(() => {
-    if (docked && store.get<boolean>(OPEN_KEY)) dispatch({ t: "open" });
-  }, [docked]);
+    if (beside && store.get<boolean>(OPEN_KEY)) dispatch({ t: "open" });
+  }, [beside]);
   useEffect(() => {
-    if (docked) store.set(OPEN_KEY, s.open);
-  }, [docked, s.open]);
+    if (beside) store.set(OPEN_KEY, s.open);
+  }, [beside, s.open]);
 
   // Keep the hand-made items for this chat.
   const items = s.items;
@@ -325,6 +340,9 @@ export function PaneProvider({ conversationId, children }: { conversationId: str
   const value: Pane = {
     ...s,
     docked,
+    canFloat,
+    floating,
+    setFloating,
     dispatch,
     toggle,
     lookup,
