@@ -174,7 +174,7 @@ function Floating() {
   );
 }
 
-/** The pane when it is not inside the chat: a floating window once detached, a drawer on narrow screens. */
+/** The pane when it is not inside the chat: a floating window once detached, else a drawer under the header. */
 export function PaneOverlay() {
   const pane = usePane();
   const mode = usePaneMode();
@@ -183,8 +183,9 @@ export function PaneOverlay() {
   return (
     <Dialog.Root open={mode === "drawer"} onOpenChange={(o) => pane.dispatch(o ? { t: "open" } : { t: "close" })}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-void/70" />
-        <Dialog.Content className="fixed inset-y-0 right-0 z-50 w-full overflow-y-auto border-l border-line bg-bg sm:w-[480px]">
+        {/* Under the header, so the wallet button and menu stay in view. */}
+        <Dialog.Overlay className="fixed inset-x-0 bottom-0 top-15 z-40 bg-void/70" />
+        <Dialog.Content className="fixed bottom-0 right-0 top-15 z-50 w-full overflow-y-auto rounded-t-card border-x border-t border-line bg-bg sm:w-[480px]">
           <Dialog.Description className="sr-only">Token checks and swaps</Dialog.Description>
           <Body title={<Dialog.Title className="sr-only">Side pane</Dialog.Title>} mode="drawer" />
         </Dialog.Content>

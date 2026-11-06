@@ -143,6 +143,8 @@ type Pane = State & {
   /** The user detached the pane into a floating window. */
   floating: boolean;
   setFloating: (on: boolean) => void;
+  /** The pane shows without covering the chat: inside it, or floating. */
+  beside: boolean;
   dispatch: (a: Action) => void;
   toggle: (tab: Tab) => void;
   /** Checks a token, or searches when the input isn't an account id. */
@@ -317,7 +319,13 @@ export function PaneProvider({ conversationId, children }: { conversationId: str
     return [...latest.values()].sort((a, b) => a.at - b.at);
   }, [s.items]);
 
-  const ask = useCallback((text: string) => askRef.current?.(text), []);
+  // A drawer covers the chat: close it so the answer is in view.
+  const besideRef = useRef(beside);
+  besideRef.current = beside;
+  const ask = useCallback((text: string) => {
+    if (!besideRef.current) dispatch({ t: "close" });
+    askRef.current?.(text);
+  }, []);
   const bindAsk = useCallback((fn: ((text: string) => void) | null) => {
     askRef.current = fn;
   }, []);
@@ -343,6 +351,7 @@ export function PaneProvider({ conversationId, children }: { conversationId: str
     canFloat,
     floating,
     setFloating,
+    beside,
     dispatch,
     toggle,
     lookup,

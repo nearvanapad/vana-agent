@@ -48,12 +48,12 @@ const isSwap = (i: PaneItem) => i.kind === "quote" || i.kind === "proposal";
 
 /**
  * Mirrors the chat's tool calls into the pane. Calls already in the thread when it opened are
- * listed quietly; a new call while the agent works brings the pane forward (when it's docked),
+ * listed quietly; a new call while the agent works brings the pane forward (when it won't cover the chat),
  * types its input in and shows the result as it arrives.
  */
 export function useChatSync(messages: UIMessage[]) {
   const pane = usePane();
-  const { dispatch, docked } = pane;
+  const { dispatch, beside } = pane;
   const seen = useRef<Map<string, string> | null>(null);
 
   useEffect(() => {
@@ -101,7 +101,7 @@ export function useChatSync(messages: UIMessage[]) {
       if (isSwap(item)) {
         dispatch({ t: "fillSwap", input: item.input });
         dispatch({ t: "swapFocus", id: item.id });
-        if (docked) dispatch({ t: "open", tab: "swap" });
+        if (beside) dispatch({ t: "open", tab: "swap" });
         continue;
       }
       if (item.kind === "report") {
@@ -113,7 +113,7 @@ export function useChatSync(messages: UIMessage[]) {
         if (item.kind === "search") dispatch({ t: "fillCheck", text: item.query });
         dispatch({ t: "focus", id: item.id });
       }
-      if (docked) dispatch({ t: "open", tab: "check" });
+      if (beside) dispatch({ t: "open", tab: "check" });
     }
-  }, [messages, dispatch, docked]);
+  }, [messages, dispatch, beside]);
 }

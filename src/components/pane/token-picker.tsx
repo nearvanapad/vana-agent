@@ -1,8 +1,8 @@
 "use client";
 
-import * as Dialog from "@radix-ui/react-dialog";
+import * as Popover from "@radix-ui/react-popover";
 import { clsx } from "clsx";
-import { BadgeCheck, ChevronDown, Loader2, Search, ShieldCheck, X } from "lucide-react";
+import { BadgeCheck, ChevronDown, Loader2, Search, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { WALLET } from "@/lib/near/network";
 import { usePane } from "./pane-context";
@@ -41,7 +41,7 @@ function Avatar({ icon, symbol, size = 28 }: { icon: string | null; symbol: stri
 }
 
 /**
- * A token field: shows the chosen token, and opens a searchable list of every token with a Rhea
+ * A token field: shows the chosen token, and opens, under the field, a searchable list of every token with a Rhea
  * pool on the swap network, filterable by launchpad. A contract not in the list can be pasted.
  */
 export function TokenPicker({ value, onChange, label, typing }: { value: string; onChange: (v: string) => void; label: string; typing?: boolean }) {
@@ -83,8 +83,14 @@ export function TokenPicker({ value, onChange, label, typing }: { value: string;
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={setOpen}>
-      <Dialog.Trigger asChild>
+    <Popover.Root
+      open={open}
+      onOpenChange={(o) => {
+        setOpen(o);
+        if (!o) setQuery("");
+      }}
+    >
+      <Popover.Trigger asChild>
         <button
           type="button"
           aria-label={label}
@@ -105,24 +111,21 @@ export function TokenPicker({ value, onChange, label, typing }: { value: string;
           )}
           <ChevronDown size={14} className="shrink-0 text-text-2" />
         </button>
-      </Dialog.Trigger>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-[60] bg-void/70" />
-        <Dialog.Content
-          className="fixed left-1/2 top-[8vh] z-[70] flex max-h-[84vh] w-[calc(100%-32px)] max-w-md -translate-x-1/2 flex-col rounded-card border border-line bg-bg shadow-2xl"
+      </Popover.Trigger>
+      <Popover.Portal>
+        {/* As wide as the field, at least 320px; as tall as the room under (or over) it allows. */}
+        <Popover.Content
+          align="end"
+          sideOffset={6}
+          collisionPadding={8}
+          aria-label={label}
+          className="z-[70] flex max-h-[min(560px,var(--radix-popover-content-available-height))] w-[max(var(--radix-popover-trigger-width),320px)] max-w-[calc(100vw-16px)] flex-col rounded-card border border-line bg-bg shadow-2xl shadow-void/60"
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             (e.currentTarget as HTMLElement).querySelector("input")?.focus();
           }}
         >
-          <header className="flex items-center justify-between gap-2 border-b border-line px-4 py-3">
-            <Dialog.Title className="text-sm font-semibold">{label}</Dialog.Title>
-            <Dialog.Description className="sr-only">Tokens with a Rhea pool on NEAR {WALLET.id}</Dialog.Description>
-            <Dialog.Close className="rounded p-1 text-text-2 hover:bg-surface-2" aria-label="Close">
-              <X size={16} />
-            </Dialog.Close>
-          </header>
-          <div className="space-y-2 border-b border-line px-4 py-3">
+          <div className="space-y-2 border-b border-line px-3 py-3">
             <label className="flex items-center gap-2 rounded-well border border-line bg-surface px-3 py-2 focus-within:border-muted">
               <Search size={14} className="text-text-2" />
               <input
@@ -234,12 +237,12 @@ export function TokenPicker({ value, onChange, label, typing }: { value: string;
             )}
             {matches.length > SHOWN && <li className="px-4 py-2 text-center text-xs text-text-2">{matches.length - SHOWN} more: type to narrow</li>}
           </ul>
-          <p className="border-t border-line px-4 py-2 text-[0.7rem] text-text-2">
+          <p className="border-t border-line px-3 py-2 text-[0.7rem] text-text-2">
             {tokens.length ? `${tokens.length} tokens` : "Tokens"} with a Rhea pool against NEAR on {WALLET.id}. Anyone can make a token: check it before you buy.
           </p>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        </Popover.Content>
+      </Popover.Portal>
+    </Popover.Root>
   );
 }
 

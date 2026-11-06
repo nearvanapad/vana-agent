@@ -160,7 +160,8 @@ export function ChatApp() {
         </Dialog.Root>
 
         <main className="flex min-w-0 flex-1 flex-col">
-          <header className="flex shrink-0 items-center justify-between gap-3 px-4 py-3">
+          {/* 60px tall: the pane drawer opens just under it. */}
+          <header className="flex h-15 shrink-0 items-center justify-between gap-3 px-4">
             <div className="flex items-center gap-2 md:invisible">
               <button type="button" onClick={() => setMenu(true)} className="rounded p-1.5 text-text-2 hover:bg-surface-2 md:hidden" aria-label="Open menu">
                 <Menu size={20} />

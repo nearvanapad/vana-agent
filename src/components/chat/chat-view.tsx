@@ -60,18 +60,26 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
     setTimeout(() => void qc.invalidateQueries({ queryKey: ["conversations"] }), 800);
   };
 
-  // The pane can write to the chat (a picked candidate, "ask about this"), but not over an answer in progress.
+  // The pane can write to the chat (a picked candidate, "ask about this"). Over an answer in
+  // progress, the question waits for it to finish.
   const sendRef = useRef(send);
   sendRef.current = send;
   const busyRef = useRef(busy);
   busyRef.current = busy;
+  const [queued, setQueued] = useState<string | null>(null);
   const { bindAsk } = pane;
   useEffect(() => {
     bindAsk((text) => {
-      if (!busyRef.current) sendRef.current(text);
+      if (busyRef.current) setQueued(text);
+      else sendRef.current(text);
     });
     return () => bindAsk(null);
   }, [bindAsk]);
+  useEffect(() => {
+    if (busy || !queued) return;
+    setQueued(null);
+    sendRef.current(queued);
+  }, [busy, queued]);
 
   const last = messages[messages.length - 1];
   const waiting = status === "submitted" || (status === "streaming" && last?.role === "assistant" && last.parts.every((p) => p.type === "step-start"));
