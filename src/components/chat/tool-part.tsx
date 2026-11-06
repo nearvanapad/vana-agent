@@ -29,7 +29,7 @@ export function toolLabel(name: string, input: Input, done = false): string {
     case "creator_history":
       return v(`Looking up the creator's other launches for ${t}`, `Looked up the creator's other launches for ${t}`);
     case "find_tokens":
-      return v("Screening the newest launches", "Screened the newest launches");
+      return v(`Screening the newest ${pads(input)} launches`, `Screened the newest ${pads(input)} launches`);
     case "dev_profile":
       return v(`Looking into the dev of ${t}`, `Looked into the dev of ${t}`);
     case "wallet_profile":
@@ -45,6 +45,12 @@ export function toolLabel(name: string, input: Input, done = false): string {
     default:
       return v(`Running ${name}`, `Ran ${name}`);
   }
+}
+
+/** Which launchpads a screen covers: the one asked for, or the mainnet ones by default. */
+function pads(input: Input): string {
+  const p = input?.platform;
+  return p === "nearly" || p === "justhoot" || p === "nearvana" ? p : "nearly and justhoot";
 }
 
 /** Asset ids can be long: keep the readable end. */

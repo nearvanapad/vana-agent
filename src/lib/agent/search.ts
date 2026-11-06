@@ -1,4 +1,9 @@
+import { explorer, MAINNET, networkOf, TESTNET, type NetworkId } from "../near/network";
+import { forAccount, onNetwork } from "../near/network-server";
 import { tryView } from "../near/rpc";
+import { allLaunches as nearlyLaunches } from "../risk/launchpad/nearly";
+import * as nearvana from "../risk/launchpad/nearvana";
+import type { LaunchpadName } from "../risk/types";
 import { normalizeToken } from "../risk/report";
 import { ref, type SourceRef } from "../sources/http";
 import { swapAssets } from "../sources/oneclick";
@@ -16,34 +21,43 @@ export type TokenMatch = {
   pools: number | null;
   /** NEAR Intents can swap it. */
   intents: boolean;
+  /** The launchpad it was launched on, when known. */
+  launchpad: LaunchpadName | null;
+  network: NetworkId;
 };
 
 /** Account ids a short name is often deployed under. */
 const GUESSES = (q: string) => [q, `${q}.near`, `${q}.tkn.near`, `${q}.nearlytrade.near`];
 
 /**
- * Token contracts matching a symbol, name or account id. Many tokens share a symbol, so all
+ * Token contracts matching a symbol, name or account id, from the price and swap lists and the
+ * launchpads' launches (nearly on mainnet, nearvana on testnet). Many tokens share a symbol, so all
  * candidates are returned, verified and well-pooled ones first, for the user to pick from.
  */
 export async function searchToken(query: string): Promise<{ query: string; matches: TokenMatch[]; sources: SourceRef[] }> {
   const q = query.trim().replace(/^\$/, "").toLowerCase();
-  const [px, verified, assets] = await Promise.all([
+  const [px, verified, assets, nearly, nv] = await Promise.all([
     prices().catch(() => null),
     whitelist().catch(() => new Set<string>()),
     swapAssets().catch(() => null),
+    onNetwork(MAINNET, nearlyLaunches).catch(() => null),
+    onNetwork(TESTNET, nearvana.allLaunches).catch(() => null),
   ]);
   const sources: SourceRef[] = [];
   if (px) sources.push(ref(px.source, px.url, new Date(px.as_of)));
   if (assets) sources.push(ref(assets.source, assets.url, new Date(assets.as_of)));
+  if (nearly) sources.push(ref("NEAR RPC", explorer("/address/nearlytrade.near")));
+  if (nv) sources.push(ref("NEAR RPC", `${TESTNET.explorer}/address/${nearvana.NEARVANA}`));
 
   const nearAssets = new Set(
     (assets?.data ?? []).filter((a) => a.assetId.startsWith("nep141:")).map((a) => a.assetId.slice("nep141:".length)),
   );
 
-  const scored = new Map<string, { score: number; symbol: string; price: number | null }>();
-  const consider = (token: string, symbol: string, price: number | null, score: number) => {
+  const scored = new Map<string, { score: number; symbol: string; price: number | null; launchpad: LaunchpadName | null }>();
+  const consider = (token: string, symbol: string, price: number | null, score: number, launchpad: LaunchpadName | null = null) => {
     const prev = scored.get(token);
-    if (!prev || prev.score < score) scored.set(token, { score, symbol, price });
+    if (!prev || prev.score < score) scored.set(token, { score, symbol, price, launchpad: launchpad ?? prev?.launchpad ?? null });
+    else if (launchpad && !prev.launchpad) prev.launchpad = launchpad;
   };
 
   for (const [token, p] of px?.data ?? []) {
@@ -57,6 +71,19 @@ export async function searchToken(query: string): Promise<{ query: string; match
     if (!a.assetId.startsWith("nep141:")) continue;
     const token = a.assetId.slice("nep141:".length);
     if (a.symbol.toLowerCase() === q) consider(token, a.symbol, a.price, 4);
+  }
+
+  // Launchpad tokens, by symbol or by the first part of their account id.
+  const launches = [
+    ...(nearly ?? []).map((l) => ({ token: l.token, symbol: l.symbol, platform: "nearly" as const })),
+    ...(nv ?? []).filter((l) => !l.failed).map((l) => ({ token: l.token, symbol: l.symbol, platform: "nearvana" as const })),
+  ];
+  for (const l of launches) {
+    const sym = l.symbol.toLowerCase();
+    const head = l.token.split(".")[0] ?? "";
+    if (l.token === q) consider(l.token, l.symbol, null, 5, l.platform);
+    else if (sym === q || head === q) consider(l.token, l.symbol, null, 4, l.platform);
+    else if (q.length >= 3 && (sym.startsWith(q) || head.startsWith(q))) consider(l.token, l.symbol, null, 2, l.platform);
   }
 
   // Unlisted tokens (fresh launches) don't appear in any list: try the account ids it may live at.
@@ -77,7 +104,7 @@ export async function searchToken(query: string): Promise<{ query: string; match
   const top = [...scored.entries()]
     .sort(([a, x], [b, y]) => y.score - x.score || Number(verified.has(b)) - Number(verified.has(a)) || (y.price ?? 0) - (x.price ?? 0))
     .slice(0, 12);
-  const withPools = await Promise.all(top.map(async ([token, m]) => ({ token, m, pools: await poolCount(token) })));
+  const withPools = await Promise.all(top.map(async ([token, m]) => ({ token, m, pools: await forAccount(token, () => poolCount(token)).catch(() => null) })));
   const matches = withPools
     .map(({ token, m, pools }) => ({
       token,
@@ -86,6 +113,8 @@ export async function searchToken(query: string): Promise<{ query: string; match
       verified: verified.has(token),
       pools,
       intents: nearAssets.has(token),
+      launchpad: m.launchpad,
+      network: networkOf(token).id,
       score: m.score,
     }))
     .sort((a, b) => b.score - a.score || Number(b.verified) - Number(a.verified) || (b.pools ?? 0) - (a.pools ?? 0))

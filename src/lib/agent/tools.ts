@@ -177,7 +177,7 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
 
     creator_history: tool({
       description:
-        "The token creator's other launches on nearly and justhoot and how each ended: still trading, dead (sold back to the launch price, emptied pool, or no trades after day one), or sold off by the dev.",
+        "The token creator's other launches and how each ended (nearly and justhoot for mainnet tokens, nearvana for testnet tokens): still trading, dead (sold back to the launch price, emptied pool, or no trades after day one), or sold off by the dev.",
       inputSchema: z.object({ token: tokenArg }),
       execute: async ({ token }) => {
         const r = await riskReport(token);
@@ -235,7 +235,7 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
 
     search_token: tool({
       description:
-        "Find token contracts by symbol or name (e.g. 'USDC', 'sweat', 'xrpx'). Many tokens share a symbol, so it returns every candidate with price, verified flag, pool count and whether NEAR Intents can swap it. Show the user the candidates when more than one fits.",
+        "Find token contracts by symbol or name (e.g. 'USDC', 'sweat', 'xrpx', 'codasc'). Searches the price and swap lists and every launch on nearly (mainnet) and nearvana (testnet), so it finds old launches too. Many tokens share a symbol, so it returns every candidate with price, verified flag, pool count and whether NEAR Intents can swap it. Show the user the candidates when more than one fits.",
       inputSchema: z.object({ query: z.string().min(1).max(64) }),
       execute: async ({ query }) => {
         const r = await searchToken(query);
