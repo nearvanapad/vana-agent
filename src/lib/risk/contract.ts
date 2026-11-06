@@ -1,4 +1,4 @@
-import { EXPLORER_ACCOUNT } from "../near/config";
+import { explorer, net } from "../near/network";
 import { contractHash, RpcError, tryView, viewAccessKeys, viewAccount, viewCode, type AccountView } from "../near/rpc";
 import { decodeBase64, wasmExports } from "../near/wasm-exports";
 import { ref } from "../sources/http";
@@ -22,7 +22,7 @@ export type ContractFacts = {
 export class TokenNotFound extends Error {
   constructor(
     readonly token: string,
-    why = "does not exist on NEAR mainnet",
+    why = `does not exist on NEAR ${net().id}`,
   ) {
     super(`${token} ${why}. If that was a symbol, search for its contract first.`);
     this.name = "TokenNotFound";
@@ -154,6 +154,6 @@ export function contractCheck(f: ContractFacts, opts: { verified: boolean; launc
       verified_on_rhea: opts.verified,
       source_code: f.source_link,
     },
-    sources: [ref("NEAR RPC", `${EXPLORER_ACCOUNT}${f.token}`, new Date(f.as_of))],
+    sources: [ref("NEAR RPC", explorer(`/address/${f.token}`), new Date(f.as_of))],
   };
 }

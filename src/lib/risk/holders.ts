@@ -1,14 +1,14 @@
 import * as fastnear from "../sources/fastnear";
 import { refOf, type SourceRef, type Sourced } from "../sources/http";
 import * as nearblocks from "../sources/nearblocks";
-import { CLASSIC, DCL } from "../sources/rhea";
+import { classic, dcl } from "../sources/rhea";
 import { isLaunchpadInfra } from "./launchpad";
 import { concentration, DEV_RED_PCT, DEV_YELLOW_PCT, fmtPct, pct, TOP10_RED_PCT, TOP10_YELLOW_PCT, WHALE_PCT } from "./rules";
 import type { Check, Level, TokenInfo, Wallet } from "./types";
 
 /** Accounts that hold tokens for others or for no one: left out of the top 10. */
 export function infraLabel(account: string): string | null {
-  if (account === CLASSIC || account === DCL) return "Rhea pool";
+  if (account === classic() || account === dcl()) return "Rhea pool";
   if (isLaunchpadInfra(account)) return "launchpad / locker";
   if (/^0{64}$/.test(account) || account === "system" || /(^|\.)burn(\.|$)/.test(account)) return "burned";
   if (account === "intents.near") return "NEAR Intents (held for its users)";

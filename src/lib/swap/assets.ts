@@ -48,6 +48,7 @@ async function rheaPrice(token: string): Promise<number | null> {
  */
 export async function resolveAsset(input: string): Promise<Asset> {
   const q = input.trim();
+  if (/\.testnet$/i.test(q)) throw new SwapError("Swaps run on mainnet only. Testnet tokens can be checked, not swapped.");
   const list = await listed();
 
   if (/^w?near$/i.test(q)) {

@@ -1,3 +1,4 @@
+import { explorer } from "../near/network";
 import { tool, type InferUITools } from "ai";
 import { z } from "zod";
 import { riskReport } from "../risk/report";
@@ -136,7 +137,7 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
           top10_pct: hold?.numbers.top10_pct ?? null,
           holder_count: hold?.numbers.holder_count ?? null,
           sources: [
-            ref("NEAR RPC", `https://nearblocks.io/token/${r.token}`, new Date(r.as_of)),
+            ref("NEAR RPC", explorer(`/token/${r.token}`), new Date(r.as_of)),
             ...(px && price !== null ? [refOf(px)] : []),
           ],
           as_of: r.as_of,

@@ -1,4 +1,4 @@
-import { EXPLORER_ACCOUNT } from "../near/config";
+import { explorer } from "../near/network";
 import { tryView } from "../near/rpc";
 import { ref, refOf, type SourceRef } from "../sources/http";
 import type { Pool } from "../sources/rhea";
@@ -31,7 +31,7 @@ export async function taxesCheck(info: TokenInfo, f: ContractFacts, pools: Pool[
     const t = await tokenTax(f);
     if (t) {
       rate = { ...t, from: "token contract" };
-      sources.push(ref("NEAR RPC", `${EXPLORER_ACCOUNT}${f.token}`));
+      sources.push(ref("NEAR RPC", explorer(`/address/${f.token}`)));
     }
   }
 
@@ -77,6 +77,6 @@ export async function taxesCheck(info: TokenInfo, f: ContractFacts, pools: Pool[
       set_by: rate?.from ?? null,
       pool_taxes: taxedPools.map((p) => ({ pool: p.id, tax: p.tax })),
     },
-    sources: sources.length ? sources : [ref("NEAR RPC", `${EXPLORER_ACCOUNT}${f.token}`)],
+    sources: sources.length ? sources : [ref("NEAR RPC", explorer(`/address/${f.token}`))],
   };
 }

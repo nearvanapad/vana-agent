@@ -1,4 +1,5 @@
 import { getDb, kv } from "../db";
+import { forAccount } from "../near/network-server";
 import { view } from "../near/rpc";
 import { poolsFor, whitelist } from "../sources/rhea";
 import { contractCheck, loadContract, type ContractFacts } from "./contract";
@@ -42,7 +43,8 @@ async function tokenInfo(token: string, facts: ContractFacts): Promise<TokenInfo
   else {
     // Who created the token account.
     const o = await origin(token).catch(() => null);
-    if (o?.funder && o.funder !== token) dev = { account: o.funder, via: "creator" };
+    // A registrar (near, testnet, tg) creates accounts for anyone: it is nobody's dev.
+    if (o?.funder && o.funder !== token && o.funder.includes(".")) dev = { account: o.funder, via: "creator" };
   }
 
   return {
@@ -138,6 +140,10 @@ export async function buildReport(token: string, opts: { quick?: boolean } = {})
 /** The report for `input`, from the cache when fresh. `fresh` forces a new one. A full report also answers a quick one. */
 export async function riskReport(input: string, opts: ReportOpts = {}): Promise<RiskReport> {
   const token = normalizeToken(input);
+  return forAccount(token, () => cachedReport(token, opts));
+}
+
+async function cachedReport(token: string, opts: ReportOpts): Promise<RiskReport> {
   const db = getDb();
   if (!opts.fresh) {
     const row = db.prepare("SELECT json, created_at FROM reports WHERE token = ?").get(token) as

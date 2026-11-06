@@ -1,3 +1,4 @@
+import { explorer } from "../near/network";
 import { mapLimit, ref, type SourceRef } from "../sources/http";
 import { recentRooms } from "./launchpad/justhoot";
 import { NEARLY, recentLaunches } from "./launchpad/nearly";
@@ -35,7 +36,7 @@ async function candidates(platform: ScreenInput["platform"], n: number): Promise
     ...(hoot ?? []).map((r) => ({ token: r.token, platform: "justhoot" as const, created_at: r.created_at })),
   ].sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at));
   const sources: SourceRef[] = [];
-  if (nearly) sources.push(ref("NEAR RPC", `https://nearblocks.io/address/${NEARLY}`));
+  if (nearly) sources.push(ref("NEAR RPC", explorer(`/address/${NEARLY}`)));
   if (hoot) sources.push(ref("justhoot", "https://justhoot.fun"));
   if (!nearly && !hoot) throw new Error("Neither launchpad answered. Try again in a minute.");
   return { list: list.slice(0, n), sources };

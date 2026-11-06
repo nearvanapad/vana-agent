@@ -1,12 +1,12 @@
 /**
  * Prints the risk report for each token given, or for a default set: a large verified token, a
- * plain token, a nearly launch and a justhoot launch.
+ * plain token, a nearly launch, a justhoot launch and the bad demo token on testnet.
  *   pnpm smoke [token...] [--fresh] [--json]
  */
 import { riskReport } from "../src/lib/risk/report";
 import type { Level, RiskReport } from "../src/lib/risk/types";
 
-const DEFAULTS = ["token.sweat", "usdt.tether-token.near", "xrpx.nearlytrade.near", "mns-11.v2-launchpad.justhoot.near"];
+const DEFAULTS = ["token.sweat", "usdt.tether-token.near", "xrpx.nearlytrade.near", "mns-11.v2-launchpad.justhoot.near", "rug.vanarug4hgzsi.testnet"];
 
 const args = process.argv.slice(2);
 const fresh = args.includes("--fresh");

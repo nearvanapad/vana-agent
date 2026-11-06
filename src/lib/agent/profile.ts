@@ -1,5 +1,8 @@
 import { getDb } from "../db";
-import { EXPLORER_ACCOUNT, YOCTO } from "../near/config";
+import { networkOf } from "../near/network";
+import { forAccount } from "../near/network-server";
+import { YOCTO } from "../near/config";
+import { explorer } from "../near/network";
 import { contractHash, RpcError, viewAccessKeys, viewAccount } from "../near/rpc";
 import { infraLabel } from "../risk/holders";
 import { ageDays, origin, originSource } from "../risk/wallets";
@@ -11,7 +14,7 @@ import { stranger } from "./guard";
 
 export class AccountNotFound extends Error {
   constructor(readonly account: string) {
-    super(`${account} does not exist on NEAR mainnet`);
+    super(`${account} does not exist on NEAR ${networkOf(account).id}`);
     this.name = "AccountNotFound";
   }
 }
@@ -40,7 +43,11 @@ export type WalletProfile = {
 };
 
 /** Who an account is: balance, keys, age, who created it and what it holds. */
-export async function walletProfile(account: string): Promise<WalletProfile> {
+export function walletProfile(account: string): Promise<WalletProfile> {
+  return forAccount(account, () => loadProfile(account));
+}
+
+async function loadProfile(account: string): Promise<WalletProfile> {
   const acc = await viewAccount(account).catch((e) => {
     if (e instanceof RpcError && e.kind === "UNKNOWN_ACCOUNT") throw new AccountNotFound(account);
     throw e;
@@ -71,7 +78,7 @@ export async function walletProfile(account: string): Promise<WalletProfile> {
   }
   holdings.sort((a, b) => b.usd - a.usd);
 
-  const sources: SourceRef[] = [ref("NEAR RPC", `${EXPLORER_ACCOUNT}${account}`)];
+  const sources: SourceRef[] = [ref("NEAR RPC", explorer(`/address/${account}`))];
   if (o?.tx) sources.push(originSource(o));
   if (tokens) sources.push(ref(tokens.source, tokens.url, new Date(tokens.as_of)));
   if (px && holdings.length) sources.push(ref(px.source, px.url, new Date(px.as_of)));

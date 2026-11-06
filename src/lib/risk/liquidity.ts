@@ -1,4 +1,4 @@
-import { EXPLORER_ACCOUNT } from "../near/config";
+import { explorer } from "../near/network";
 import { viewAccessKeys } from "../near/rpc";
 import { ref, refOf, type SourceRef, type Sourced } from "../sources/http";
 import { poolShares, positionOwner, prices, type Pool } from "../sources/rhea";
@@ -135,7 +135,7 @@ async function lpControl(info: TokenInfo, pools: Pool[]) {
   if (lpt) {
     const owner = await positionOwner(lpt);
     numbers.launch_position_owner = owner;
-    if (owner) sources.push(ref("NEAR RPC", `${EXPLORER_ACCOUNT}${owner}`));
+    if (owner) sources.push(ref("NEAR RPC", explorer(`/address/${owner}`)));
     if (!owner) {
       findings.push({ level: "not_checked", text: "Could not read who owns the launch liquidity position." });
     } else if (owner === dev) {

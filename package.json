@@ -13,7 +13,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "probe": "tsx scripts/probe.ts",
-    "smoke": "tsx scripts/smoke.ts"
+    "smoke": "tsx scripts/smoke.ts",
+    "demo-token": "tsx scripts/demo-token.ts"
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "3.0.82",
@@ -39,6 +40,7 @@
     "@types/node": "24.19.0",
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
+    "near-api-js": "7.3.1",
     "tailwindcss": "4.3.3",
     "tsx": "^4.23.15",
     "typescript": "6.0.3"

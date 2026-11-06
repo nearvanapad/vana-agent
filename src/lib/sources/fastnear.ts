@@ -1,7 +1,8 @@
+import { explorer, net } from "../near/network";
 import { getJson, sourced, type Sourced } from "./http";
 import type { Holder } from "./nearblocks";
 
-const API = "https://api.fastnear.com/v1";
+const API = () => net().fastnearApi;
 
 function headers(): Record<string, string> {
   const key = process.env.FASTNEAR_API_KEY;
@@ -10,21 +11,21 @@ function headers(): Record<string, string> {
 
 /** Top 100 holders of a token, raw amounts, largest first. */
 export async function topHolders(token: string): Promise<Sourced<Holder[]>> {
-  const url = `${API}/ft/${encodeURIComponent(token)}/top`;
+  const url = `${API()}/ft/${encodeURIComponent(token)}/top`;
   const r = await getJson<{ accounts: { account_id: string; balance: string }[] }>(url, { headers: headers() });
   const list = r.accounts
     .map((a) => ({ account: a.account_id, amount: a.balance }))
     .filter((h) => BigInt(h.amount) > 0n)
     .sort((a, b) => (BigInt(b.amount) > BigInt(a.amount) ? 1 : -1));
-  return sourced(list, "FastNEAR", `https://nearblocks.io/token/${token}?tab=holders`);
+  return sourced(list, "FastNEAR", explorer(`/token/${token}?tab=holders`));
 }
 
 /** Every token an account has touched, with its raw balance. */
 export async function accountTokens(account: string): Promise<Sourced<{ token: string; amount: string }[]>> {
-  const url = `${API}/account/${encodeURIComponent(account)}/ft`;
+  const url = `${API()}/account/${encodeURIComponent(account)}/ft`;
   const r = await getJson<{ tokens: { contract_id: string; balance: string | null }[] }>(url, { headers: headers() });
   const list = r.tokens
     .filter((t) => t.balance && /^\d+$/.test(t.balance) && t.balance !== "0")
     .map((t) => ({ token: t.contract_id, amount: t.balance! }));
-  return sourced(list, "FastNEAR", `https://nearblocks.io/address/${account}?tab=tokens`);
+  return sourced(list, "FastNEAR", explorer(`/address/${account}?tab=tokens`));
 }

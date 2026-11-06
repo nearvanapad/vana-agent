@@ -1,3 +1,5 @@
+import { explorer } from "../near/network";
+import { net } from "../near/network";
 import { tryView } from "../near/rpc";
 import { mapLimit, ref, type SourceRef } from "../sources/http";
 import { prices } from "../sources/rhea";
@@ -93,6 +95,18 @@ export async function creatorCheck(info: TokenInfo): Promise<Check> {
     };
   }
 
+  if (net().id !== "mainnet") {
+    return {
+      id: "creator",
+      title: "Creator history",
+      level: "not_checked",
+      summary: "Not checked: nearly and justhoot run on mainnet only.",
+      findings: [{ level: "not_checked", text: "The launchpads this check reads (nearly, justhoot) run on mainnet only, so there is no launch history on testnet." }],
+      numbers: { creator: dev },
+      sources: [],
+    };
+  }
+
   const [nearly, rooms, px] = await Promise.all([
     launchesBy(dev).catch(() => null),
     roomsBy(dev).catch(() => null),
@@ -101,7 +115,7 @@ export async function creatorCheck(info: TokenInfo): Promise<Check> {
       .catch(() => null),
   ]);
   const sources: SourceRef[] = [];
-  if (nearly) sources.push(ref("NEAR RPC", `https://nearblocks.io/address/${NEARLY}`));
+  if (nearly) sources.push(ref("NEAR RPC", explorer(`/address/${NEARLY}`)));
   if (rooms) sources.push(ref("justhoot", `https://justhoot.fun`));
   if (!nearly && !rooms) throw new Error("both launchpads unreachable");
 
@@ -168,7 +182,7 @@ export async function creatorCheck(info: TokenInfo): Promise<Check> {
       dead,
       dev_sold: sold,
       alive: count("alive"),
-      past: past.map((p) => ({ token: p.token, platform: p.platform, created_at: p.created_at, outcome: p.outcome, detail: p.detail, url: p.platform === "justhoot" ? hootUrl(p.token) : `https://nearblocks.io/token/${p.token}` })),
+      past: past.map((p) => ({ token: p.token, platform: p.platform, created_at: p.created_at, outcome: p.outcome, detail: p.detail, url: p.platform === "justhoot" ? hootUrl(p.token) : explorer(`/token/${p.token}`) })),
     },
     wallets,
     sources,

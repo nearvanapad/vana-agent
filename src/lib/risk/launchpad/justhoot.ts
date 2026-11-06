@@ -1,3 +1,4 @@
+import { explorer } from "../../near/network";
 import { tryView } from "../../near/rpc";
 import { getJson, ref } from "../../sources/http";
 import type { Launchpad } from "../types";
@@ -100,6 +101,6 @@ export async function justhootInfo(token: string): Promise<Launchpad | null> {
     quote: fee.pool_id?.split("|").find((t) => t !== token) ?? null,
     dev_buy: null,
     url: hootUrl(token),
-    source: ref("NEAR RPC", `https://nearblocks.io/address/${factory}`),
+    source: ref("NEAR RPC", explorer(`/address/${factory}`)),
   };
 }

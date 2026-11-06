@@ -1,8 +1,8 @@
-import { RPC_URLS } from "./config";
+import { net } from "./network";
 
 /**
  * Minimal NEAR JSON-RPC client over fetch. Works on the server and in the browser.
- * On a rate limit or gateway error it moves to the next endpoint in RPC_URLS, with backoff;
+ * On a rate limit or gateway error it moves to the next endpoint of the network, with backoff;
  * anything else fails fast.
  */
 
@@ -20,7 +20,7 @@ export class RpcError extends Error {
 
 const RETRY_STATUS = new Set([408, 410, 429, 500, 502, 503, 504]);
 
-/** Index into RPC_URLS of the endpoint to try first; moves past one that rate-limits, back after a minute. */
+/** Index into the network's RPC list of the endpoint to try first; moves past one that rate-limits, back after a minute. */
 let preferred = 0;
 let preferredAt = 0;
 
@@ -33,7 +33,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 type Finality = { finality: "final" | "optimistic" } | { block_id: number | string };
 
 export async function rpc<T>(method: string, params: unknown, opts: { url?: string; attempts?: number } = {}): Promise<T> {
-  const urls = opts.url ? [opts.url] : RPC_URLS;
+  const urls = opts.url ? [opts.url] : net().rpc;
   const attempts = opts.attempts ?? Math.max(4, urls.length + 1);
   if (preferred && Date.now() - preferredAt > 60_000) preferred = 0;
   const start = opts.url ? 0 : preferred;

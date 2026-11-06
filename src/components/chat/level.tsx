@@ -1,30 +1,52 @@
 import { clsx } from "clsx";
 import type { Level } from "@/lib/risk/types";
 
-export const LEVEL_LABEL: Record<Level, string> = {
-  red: "Red flags",
-  yellow: "Caution",
-  green: "No flags",
-  not_checked: "Not checked",
+/** A level in words and a shape, so it never rests on colour alone. */
+export const LEVEL: Record<Level, { word: string; icon: string; overall: string }> = {
+  red: { word: "Red flag", icon: "✕", overall: "Red flags" },
+  yellow: { word: "Watch", icon: "!", overall: "Things to watch" },
+  green: { word: "No flag", icon: "✓", overall: "No red flags found" },
+  not_checked: { word: "Not checked", icon: "?", overall: "Not checked" },
 };
 
-const DOT: Record<Level, string> = { red: "bg-bad", yellow: "bg-warn", green: "bg-ok", not_checked: "border border-none" };
+const MARK: Record<Level, string> = {
+  red: "bg-bad text-void border-bad",
+  yellow: "border-warn text-warn",
+  green: "bg-ok/90 text-void border-ok",
+  not_checked: "border-dashed border-none text-none",
+};
+
 const PILL: Record<Level, string> = {
-  red: "border-bad/50 text-bad",
-  yellow: "border-warn/50 text-warn",
-  green: "border-ok/50 text-ok",
-  not_checked: "border-none/50 text-none",
+  red: "border-bad/60 text-bad",
+  yellow: "border-warn/60 text-warn",
+  green: "border-ok/60 text-ok",
+  not_checked: "border-dashed border-none/60 text-none",
 };
 
-export function Dot({ level, className }: { level: Level; className?: string }) {
-  return <span aria-hidden className={clsx("inline-block size-2.5 shrink-0 rounded-full", DOT[level], className)} />;
+/** The level's icon in a round chip: a cross, a bang, a tick or a question mark. */
+export function Mark({ level, className }: { level: Level; className?: string }) {
+  return (
+    <span
+      aria-hidden
+      className={clsx("grid size-5 shrink-0 place-items-center rounded-full border-[1.5px] text-[0.65rem] font-bold leading-none", MARK[level], className)}
+    >
+      {LEVEL[level].icon}
+    </span>
+  );
 }
 
-export function LevelPill({ level }: { level: Level }) {
+/** A small dot for a single finding. */
+export function Dot({ level, className }: { level: Level; className?: string }) {
+  const dot: Record<Level, string> = { red: "bg-bad", yellow: "bg-warn", green: "bg-ok", not_checked: "border border-none" };
+  return <span aria-hidden className={clsx("inline-block size-2 shrink-0 rounded-full", dot[level], className)} />;
+}
+
+/** The overall level as a pill: icon and words. */
+export function LevelPill({ level, text }: { level: Level; text?: string }) {
   return (
-    <span className={clsx("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium", PILL[level])}>
-      <Dot level={level} className="size-2" />
-      {LEVEL_LABEL[level]}
+    <span className={clsx("inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-semibold", PILL[level])}>
+      <span aria-hidden>{LEVEL[level].icon}</span>
+      {text ?? LEVEL[level].overall}
     </span>
   );
 }

@@ -1,3 +1,5 @@
+import { netKey } from "../near/network";
+import { explorer } from "../near/network";
 import { kv } from "../db";
 import { accountTxs, transactions } from "../sources/fastnear-tx";
 import { mapLimit, ref, type SourceRef } from "../sources/http";
@@ -22,7 +24,7 @@ export type Origin = {
 };
 
 /** Top-level registrars and big relayers: they create accounts for anyone. */
-const HUB_NAMES = new Set(["near", "tg", "sweat", "kaiching", "relay.tg", "intents.near", "system", "user.intear.near", "hot.tg"]);
+const HUB_NAMES = new Set(["near", "tg", "testnet", "sweat", "kaiching", "relay.tg", "intents.near", "system", "user.intear.near", "hot.tg"]);
 const EXCHANGE = /^(binance|okx|okex|bybit|kucoin|gate|huobi|htx|mexc|bitget|coinbase|kraken|crypto|bitfinex|upbit|bithumb)[\w-]*\.near$/;
 
 /** True for accounts that fund wallets for strangers, so sharing one says nothing. */
@@ -37,7 +39,7 @@ async function fromNearblocks(account: string): Promise<Origin> {
   return { account, funder: r.data.creator !== account ? r.data.creator : null, created_at: r.data.created_at, tx: r.data.tx, txs: 0 };
 }
 
-const KEY = (a: string) => `origin2:${a}`;
+const KEY = (a: string) => netKey(`origin2:${a}`);
 
 /**
  * Origins for many accounts. Creation never changes, so each is kept for good; the tx count is
@@ -86,7 +88,7 @@ export function ageDays(o: Origin | null | undefined, now = Date.now()): number 
   return o?.created_at ? (now - Date.parse(o.created_at)) / 86_400_000 : null;
 }
 
-export const originSource = (o: Origin): SourceRef => ref("FastNEAR", o.tx ? `https://nearblocks.io/txns/${o.tx}` : `https://nearblocks.io/address/${o.account}`);
+export const originSource = (o: Origin): SourceRef => ref("FastNEAR", o.tx ? explorer(`/txns/${o.tx}`) : explorer(`/address/${o.account}`));
 
 /**
  * Share of the supply held by wallets younger than a week among the largest holders.
@@ -122,6 +124,6 @@ export async function freshCheck(holders: Wallet[], opts: { top?: number } = {})
     findings: people.length === 0 ? [{ level: "green", text: "No wallet holds the token outside pools, lockers and burns." }] : findings,
     numbers: { fresh_wallets: fresh.length, fresh_pct: freshPct, holders_checked: people.length, age_unknown: unknown, max_age_days: FRESH_MAX_AGE_DAYS },
     wallets: fresh.sort((a, b) => (b.share_pct ?? 0) - (a.share_pct ?? 0)).slice(0, 10),
-    sources: sources.length ? sources : [ref("FastNEAR", "https://nearblocks.io")],
+    sources: sources.length ? sources : [ref("FastNEAR", explorer(""))],
   };
 }

@@ -19,6 +19,9 @@ function errorText(e: Error): string {
   return e.message || "Something went wrong.";
 }
 
+/** A deliberately risky testnet token, deployed by `pnpm demo-token`, to show what a red report looks like. */
+const DEMO_TOKEN = process.env.NEXT_PUBLIC_DEMO_TOKEN || "rug.vanarug4hgzsi.testnet";
+
 export function ChatView(props: { id: string; initial: UIMessage[]; account: string | null; ready: boolean; onSend?: () => void }) {
   const { id, initial, account, ready } = props;
   const qc = useQueryClient();
@@ -32,6 +35,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
       }),
     [],
   );
+  const [stopped, setStopped] = useState(false);
   const { messages, sendMessage, status, stop, error, regenerate } = useChat({
     id,
     messages: initial,
@@ -41,6 +45,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
   const busy = status === "submitted" || status === "streaming";
 
   const send = (text: string) => {
+    setStopped(false);
     void sendMessage({ text }, { body: { think } });
     props.onSend?.();
     // The conversation exists on the server once the request lands.
@@ -77,6 +82,11 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
             <Loader2 size={14} className="animate-spin text-accent" /> {think ? "Thinking…" : "Working…"}
           </div>
         )}
+        {stopped && !busy && !error && (
+          <p className="text-xs text-text-2" role="status">
+            Stopped. What was written so far is kept in this chat.
+          </p>
+        )}
         {error && (
           <div className="flex items-start justify-between gap-3 rounded-well border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad" role="alert">
             <span className="flex items-start gap-2">
@@ -90,7 +100,12 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
         <div ref={bottom} />
       </div>
       <div className="sticky bottom-0 bg-bg pb-4 pt-2">
-        <Composer busy={busy} disabled={!ready} think={think} onThink={setThink} onSend={send} onStop={stop} />
+        <Composer busy={busy} disabled={!ready} think={think} onThink={setThink} onSend={send}
+          onStop={() => {
+            setStopped(true);
+            void stop();
+          }}
+        />
         <p className="mt-2 text-center text-xs text-text-2/80">
           Read-only checks from public chain data. Not financial advice. Your wallet signs, never the AI.
         </p>
@@ -102,16 +117,17 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
 function Empty({ account, onPick, disabled }: { account: string | null; onPick: (t: string) => void; disabled: boolean }) {
   const prompts = [
     "Is SWEAT safe?",
-    "Check usdt.tether-token.near",
-    "Who is the dev behind xrpx.nearlytrade.near?",
-    account ? "What does my wallet hold?" : "Profile the wallet root.near",
+    `Is ${DEMO_TOKEN} safe?`,
+    "Find new launches with no red flags",
+    account ? "What does my wallet hold?" : "Who is the dev behind xrpx.nearlytrade.near?",
   ];
   return (
     <div className="flex flex-col items-center gap-4 pt-[12vh] text-center">
       <ShieldCheck className="text-accent" size={40} />
       <h2 className="font-display text-3xl">Is this NEAR token safe?</h2>
       <p className="max-w-md text-text-2">
-        Ask about any NEP-141 token. VANA checks the contract, holders, liquidity and taxes, and cites every number.
+        Ask about any NEP-141 token. VANA checks the contract, the holders, who bought first and whether they are the dev in disguise, the
+        liquidity, taxes and the creator&apos;s earlier launches, and cites every number.
       </p>
       <div className="mt-2 grid w-full max-w-lg gap-2 sm:grid-cols-2">
         {prompts.map((p) => (

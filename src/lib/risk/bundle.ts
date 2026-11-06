@@ -1,3 +1,5 @@
+import { net, netKey } from "../near/network";
+import { explorer } from "../near/network";
 import { getDb, kv } from "../db";
 import { tryView } from "../near/rpc";
 import { accountTxs, ftEvents, isPool, transactions } from "../sources/fastnear-tx";
@@ -71,7 +73,7 @@ async function loadEarly(token: string): Promise<EarlyData> {
  * The token's early buyers. Kept 10 minutes while the launch is under a day old, then for good.
  */
 export async function earlyBuyers(token: string): Promise<EarlyData> {
-  const key = `early:${token}`;
+  const key = netKey(`early:${token}`);
   const hit = kv.get<EarlyData>(key);
   if (hit) return hit;
   const d = await loadEarly(token);
@@ -92,6 +94,8 @@ let warming: Promise<void> | null = null;
 
 /** Fills a cold sniper index with the early buyers of the newest launches on both launchpads. */
 export function warmIndex(): Promise<void> {
+  // The launchpads are on mainnet; a testnet token has nothing to warm from.
+  if (net().id !== "mainnet") return Promise.resolve();
   const have = (getDb().prepare("SELECT COUNT(DISTINCT token) AS n FROM early_buys").get() as { n: number }).n;
   if (have >= INDEX_MIN) return Promise.resolve();
   warming ??= (async () => {
@@ -136,7 +140,7 @@ const DEV = "\u0000dev";
 
 export async function bundleCheck(info: TokenInfo, holders: Holder[]): Promise<Check> {
   const early = await earlyBuyers(info.token);
-  const source = ref("FastNEAR", `https://nearblocks.io/token/${info.token}`);
+  const source = ref("FastNEAR", explorer(`/token/${info.token}`));
   const dev = info.dev?.account ?? null;
   const buyers = early.buyers.filter((b) => b.account !== dev);
 
@@ -187,15 +191,14 @@ export async function bundleCheck(info: TokenInfo, holders: Holder[]): Promise<C
     if (f && f === dev) {
       groups.join(a, DEV);
       note(a, "funded by the dev");
+    } else if (f && isBuyer.has(f)) {
+      groups.join(a, f);
+      note(a, `funded by early buyer ${short(f)}`);
     } else if (g && g === dev) {
       groups.join(a, DEV);
       note(a, `funded by ${short(f!)}, which the dev funded`);
     }
-    if (f && isBuyer.has(f)) {
-      groups.join(a, f);
-      note(a, `funded by early buyer ${short(f)}`);
-    }
-    if (f && !hub(f)) byFunder.set(f, [...(byFunder.get(f) ?? []), a]);
+    if (f && f !== dev && !hub(f)) byFunder.set(f, [...(byFunder.get(f) ?? []), a]);
     if (g && f && !hub(g) && !hub(f) && g !== dev) byFunder.set(`2:${g}`, [...(byFunder.get(`2:${g}`) ?? []), a]);
   }
   for (const [f, list] of byFunder) {
@@ -294,7 +297,7 @@ export async function bundleCheck(info: TokenInfo, holders: Holder[]): Promise<C
     return { account: b.account, share_pct: sharesBy.get(b.account) ?? undefined, label: tags.join("; ") };
   });
 
-  const sources: SourceRef[] = [source, ...[...hop1.values()].filter((o): o is Origin => Boolean(o?.tx)).slice(0, 2).map((o) => ref("FastNEAR", `https://nearblocks.io/txns/${o.tx}`))];
+  const sources: SourceRef[] = [source, ...[...hop1.values()].filter((o): o is Origin => Boolean(o?.tx)).slice(0, 2).map((o) => ref("FastNEAR", explorer(`/txns/${o.tx}`)))];
   return {
     id: "early_buyers",
     title: "Early buyers",

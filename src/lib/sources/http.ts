@@ -1,3 +1,4 @@
+import { net } from "../near/network";
 /**
  * Shared fetch for the data sources: JSON, timeout, retry on rate limits and gateway errors.
  * Every source wraps its answer in `Sourced` so a number can always be cited.
@@ -121,5 +122,16 @@ export function memo<T>(ttlMs: number, load: () => Promise<T>): () => Promise<T>
       if (value?.p === p) value = null;
     });
     return p;
+  };
+}
+
+/** One `make()` per network, so a memo never hands mainnet data to a testnet request. */
+export function perNetwork<T>(make: () => () => T): () => T {
+  const by = new Map<string, () => T>();
+  return () => {
+    const id = net().id;
+    let f = by.get(id);
+    if (!f) by.set(id, (f = make()));
+    return f();
   };
 }

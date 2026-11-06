@@ -130,3 +130,23 @@ The source for early buyers and wallet origins. Full history (back to 2022 for `
   - `/tokens/{id}`: `first_trade_at`, `graduated`, 24 h stats.
   - `/accounts/{id}/trades?limit=200`: an account's trades (buy/sell, token amount), used for dev sells.
 - Early buyers seen on many launches (64-hex accounts funded through `intents.near`, the `*.sendler-b.near` group) are sniper bots. The app keeps each launch's early buyers in `early_buys`; an account early in 3+ launches is flagged.
+
+## Testnet (probed 6 Nov)
+
+Tokens and accounts ending in `.testnet` are read from testnet; everything else from mainnet (`src/lib/near/network.ts`).
+- RPC `https://rpc.testnet.fastnear.com`, FastNEAR `https://test.api.fastnear.com/v1` and `https://tx.test.fastnear.com/v0`, NearBlocks `https://api-testnet.nearblocks.io/v1`, explorer `https://testnet.nearblocks.io`.
+- Rhea: classic `ref-finance-101.testnet` (2900+ pools; `get_config` is missing), DCL `dclv2.ref-dev.testnet`, wNEAR `wrap.testnet`.
+  - Instant swap through `ft_transfer_call` with msg `{"force":0,"actions":[{pool_id, token_in, token_out, min_amount_out}]}` works as on mainnet.
+- No price feed on testnet. Testnet wNEAR is valued at the mainnet NEAR price, and nothing else gets a dollar value.
+- nearly, justhoot and NEAR Intents are mainnet only.
+- Faucet: `POST https://helper.nearprotocol.com/account {newAccountId, newAccountPublicKey}` creates a `.testnet` account with 10 NEAR.
+
+## Bad demo token
+
+`pnpm demo-token` builds it from faucet accounts (`contracts/demo-token`, keys in `.demo/`, git-ignored). The live one is `rug.vanarug4hgzsi.testnet`:
+- Owner `mint` and `blacklist`, plus the dev's full-access key on the token account.
+- The dev holds about 66%, plus 8.5% through a sub-account.
+- Rhea pool 2903 holds 1.5 wNEAR and 300M VRUG; the dev owns all its LP shares.
+- Three early buyers, all tied to the dev: one funded by the dev, one dev sub-account, and one funded by the first buyer that also got 40M VRUG from the dev.
+
+Expected report: red on contract, holders, early buyers, fresh wallets and liquidity. Creator history is not checked (the launchpads it reads are on mainnet).

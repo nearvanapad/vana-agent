@@ -1,3 +1,4 @@
+import { explorer } from "../../near/network";
 import { cached } from "../../db";
 import { tryView, view } from "../../near/rpc";
 import { mapLimit, ref } from "../../sources/http";
@@ -113,8 +114,8 @@ export async function nearlyInfo(token: string): Promise<Launchpad | null> {
     state: stateOf(launch.step),
     quote: launch.quote,
     dev_buy: launch.dev_buy_near,
-    url: `https://nearblocks.io/token/${token}`,
-    source: ref("NEAR RPC", `https://nearblocks.io/address/${NEARLY}`),
+    url: explorer(`/token/${token}`),
+    source: ref("NEAR RPC", explorer(`/address/${NEARLY}`)),
   };
 }
 

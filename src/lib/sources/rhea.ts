@@ -1,17 +1,21 @@
 import { cached } from "../db";
+import { MAINNET, net, netKey } from "../near/network";
 import { tryView, view } from "../near/rpc";
-import { getJson, mapLimit, memo, sourced, type Sourced } from "./http";
+import { getJson, mapLimit, memo, perNetwork, sourced, type Sourced } from "./http";
 
-/** Rhea (Ref) classic AMM: constant-product, stable and rated pools. */
-export const CLASSIC = "v2.ref-finance.near";
-/** Rhea concentrated-liquidity (DCL) pools. */
-export const DCL = "dclv2.ref-labs.near";
+/** Rhea (Ref) classic AMM on the current network: constant-product, stable and rated pools. */
+export const classic = () => net().classic;
+/** Rhea concentrated-liquidity (DCL) pools on the current network. */
+export const dcl = () => net().dcl;
+/** Mainnet contracts, for the swap route (mainnet only). */
+export const CLASSIC = MAINNET.classic;
+export const DCL = MAINNET.dcl;
 
-const APP = "https://app.rhea.finance";
+const APP = () => net().rheaApp;
 const PAGE = 1000;
 
-export const classicPoolUrl = (id: number) => `${APP}/pool/${id}`;
-export const dclPoolUrl = (id: string) => `${APP}/poolV2/${id.replaceAll("|", "@")}`;
+export const classicPoolUrl = (id: number) => `${APP()}/pool/${id}`;
+export const dclPoolUrl = (id: string) => `${APP()}/poolV2/${id.replaceAll("|", "@")}`;
 
 type ClassicPoolRaw = {
   pool_kind: string;
@@ -74,16 +78,18 @@ type PoolIndex = {
   pools: Pool[];
   /** token → positions in `pools` */
   by_token: Record<string, number[]>;
+  /** Classic pools that existed when it was built: newer ones are read on top. */
+  classic_count?: number;
 };
 
 /** Every pool on both Rhea contracts with its reserves (~16 large views). Kept for 10 minutes. */
 const INDEX_TTL = 10 * 60_000;
-const poolIndex = memo(INDEX_TTL, () => cached("rhea:pool-index:v2", INDEX_TTL, buildPoolIndex));
+const poolIndex = perNetwork(() => memo(INDEX_TTL, () => cached(netKey("rhea:pool-index:v3"), INDEX_TTL, buildPoolIndex)));
 
 async function buildPoolIndex(): Promise<PoolIndex> {
   const [classicCount, dclMeta] = await Promise.all([
-    view<number>(CLASSIC, "get_number_of_pools"),
-    view<{ pool_count: number }>(DCL, "get_metadata"),
+    view<number>(classic(), "get_number_of_pools"),
+    view<{ pool_count: number }>(dcl(), "get_metadata"),
   ]);
   const pages = [
     ...Array.from({ length: Math.ceil(classicCount / PAGE) }, (_, i) => ({ kind: "classic" as const, from: i * PAGE })),
@@ -91,24 +97,24 @@ async function buildPoolIndex(): Promise<PoolIndex> {
   ];
   const chunks = await mapLimit(pages, 2, async ({ kind, from }) =>
     kind === "classic"
-      ? (await patient(() => view<ClassicPoolRaw[]>(CLASSIC, "get_pools", { from_index: from, limit: PAGE }))).map((p, i) =>
+      ? (await patient(() => view<ClassicPoolRaw[]>(classic(), "get_pools", { from_index: from, limit: PAGE }))).map((p, i) =>
           classicPool(from + i, p),
         )
-      : (await patient(() => view<DclPoolRaw[]>(DCL, "list_pools", { from_index: from, limit: PAGE }))).map(dclPool),
+      : (await patient(() => view<DclPoolRaw[]>(dcl(), "list_pools", { from_index: from, limit: PAGE }))).map(dclPool),
   );
   // empty pools can't be traded against; leaving them out keeps the cache small
   const pools = chunks.flat().filter((p) => p.amounts.some((a) => a !== "0"));
   const by_token: Record<string, number[]> = {};
   pools.forEach((p, i) => p.tokens.forEach((t) => (by_token[t] ??= []).push(i)));
-  return { built_at: new Date().toISOString(), pools, by_token };
+  return { built_at: new Date().toISOString(), pools, by_token, classic_count: classicCount };
 }
 
 async function freshPool(p: { kind: Pool["kind"]; id: string }): Promise<Pool | null> {
   if (p.kind === "classic") {
-    const raw = await tryView<ClassicPoolRaw>(CLASSIC, "get_pool", { pool_id: Number(p.id) });
+    const raw = await tryView<ClassicPoolRaw>(classic(), "get_pool", { pool_id: Number(p.id) });
     return raw ? classicPool(Number(p.id), raw) : null;
   }
-  const raw = await tryView<DclPoolRaw>(DCL, "get_pool", { pool_id: p.id });
+  const raw = await tryView<DclPoolRaw>(dcl(), "get_pool", { pool_id: p.id });
   return raw ? dclPool(raw) : null;
 }
 
@@ -128,18 +134,19 @@ async function patient<T>(load: () => Promise<T>, tries = 3): Promise<T> {
 }
 
 /** Quote assets and fee tiers DCL pools are usually opened with. */
-const DCL_QUOTES = ["wrap.near", "usdt.tether-token.near", "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1"];
+const DCL_QUOTES = () =>
+  net().id === "mainnet" ? ["wrap.near", "usdt.tether-token.near", "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1"] : [net().wrap];
 const DCL_FEES = [100, 400, 2000, 10000];
 
 /** Without the index: the token's DCL pools against the common quotes, found by their predictable ids. */
 async function likelyDclPools(token: string, extra: string[]): Promise<string[]> {
   const ids = new Set(extra);
-  for (const q of DCL_QUOTES) {
+  for (const q of DCL_QUOTES()) {
     if (q === token) continue;
     const [x, y] = [token, q].sort();
     for (const fee of DCL_FEES) ids.add(`${x}|${y}|${fee}`);
   }
-  const found = await mapLimit([...ids], 4, async (id) => ((await tryView<DclPoolRaw>(DCL, "get_pool", { pool_id: id })) ? id : null));
+  const found = await mapLimit([...ids], 4, async (id) => ((await tryView<DclPoolRaw>(dcl(), "get_pool", { pool_id: id })) ? id : null));
   return found.filter((id): id is string => id !== null);
 }
 
@@ -148,12 +155,22 @@ async function likelyDclPools(token: string, extra: string[]): Promise<string[]>
  * which may be newer than the index. When the index can't be built, falls back to DCL pools
  * against the common quotes, and says so in `partial`.
  */
+/** Classic pools created since the index was built that hold `token` (a fresh launch's first pool). */
+async function newClassicPools(idx: PoolIndex, token: string): Promise<Pool[]> {
+  if (idx.classic_count === undefined) return [];
+  const now = await tryView<number>(classic(), "get_number_of_pools").catch(() => null);
+  if (!now || now <= idx.classic_count) return [];
+  const from = Math.max(idx.classic_count, now - PAGE);
+  const raw = await tryView<ClassicPoolRaw[]>(classic(), "get_pools", { from_index: from, limit: now - from }).catch(() => null);
+  return (raw ?? []).map((p, i) => classicPool(from + i, p)).filter((p) => p.tokens.includes(token) && p.amounts.some((a) => a !== "0"));
+}
+
 export async function poolsFor(token: string, knownDcl: string[] = []): Promise<Sourced<Pool[]> & { partial: boolean }> {
   const idx = await poolIndex().catch(() => null);
   let refs: { kind: Pool["kind"]; id: string }[];
   let indexed: Pool[] = [];
   if (idx) {
-    indexed = (idx.by_token[token] ?? []).map((i) => idx.pools[i]!);
+    indexed = [...(idx.by_token[token] ?? []).map((i) => idx.pools[i]!), ...(await newClassicPools(idx, token))];
     const extra = knownDcl.filter((id) => !indexed.some((p) => p.id === id));
     refs = [...indexed, ...extra.map((id) => ({ kind: "dcl" as const, id }))];
   } else {
@@ -163,10 +180,10 @@ export async function poolsFor(token: string, knownDcl: string[] = []): Promise<
   if (idx && refs.length > FRESH_POOLS) {
     const extra = await mapLimit(refs.slice(indexed.length), 4, freshPool);
     const all = [...indexed, ...extra.filter((p): p is Pool => p !== null)];
-    return { ...sourced(all, "Rhea", `${APP}/pools`, new Date(idx.built_at)), partial: false };
+    return { ...sourced(all, "Rhea", `${APP()}/pools`, new Date(idx.built_at)), partial: false };
   }
   const fresh = (await mapLimit(refs, 4, freshPool)).filter((p): p is Pool => p !== null);
-  return { ...sourced(fresh, "Rhea", `${APP}/pools`), partial: !idx };
+  return { ...sourced(fresh, "Rhea", `${APP()}/pools`), partial: !idx };
 }
 
 /** How many live Rhea pools hold `token`, from the index; null when the index can't be built. */
@@ -177,8 +194,7 @@ export async function poolCount(token: string): Promise<number | null> {
 
 export type Price = { price: number; symbol: string; decimals: number };
 
-/** USD price of every token Rhea lists. Kept for 5 minutes. */
-export const prices = memo(5 * 60_000, async (): Promise<Sourced<Map<string, Price>>> => {
+const mainnetPrices = memo(5 * 60_000, async (): Promise<Sourced<Map<string, Price>>> => {
   const url = "https://api.ref.finance/list-token-price";
   const r = await getJson<Record<string, { price: string; symbol: string; decimal: number }>>(url, { timeoutMs: 20_000 });
   const map = new Map<string, Price>();
@@ -189,16 +205,29 @@ export const prices = memo(5 * 60_000, async (): Promise<Sourced<Map<string, Pri
   return sourced(map, "Rhea", url);
 });
 
+/**
+ * USD price of every token Rhea lists, kept 5 minutes. Testnet tokens have no market: testnet
+ * wNEAR is valued at the NEAR price so pool depth still reads in dollars, and nothing else is priced.
+ */
+export async function prices(): Promise<Sourced<Map<string, Price>>> {
+  const p = await mainnetPrices();
+  if (net().id === "mainnet") return p;
+  const map = new Map<string, Price>();
+  const w = p.data.get(MAINNET.wrap);
+  if (w) map.set(net().wrap, { ...w, symbol: "wNEAR" });
+  return { ...p, data: map };
+}
+
 /** Tokens Rhea marks as verified. Kept for an hour. */
-export const whitelist = memo(60 * 60_000, async () => new Set(await view<string[]>(CLASSIC, "get_whitelisted_tokens")));
+export const whitelist = perNetwork(() => memo(60 * 60_000, async () => new Set(await view<string[]>(classic(), "get_whitelisted_tokens"))));
 
 /** LP shares `account` holds in a classic pool, raw. */
 export async function poolShares(poolId: number, account: string): Promise<string> {
-  return (await tryView<string>(CLASSIC, "get_pool_shares", { pool_id: poolId, account_id: account })) ?? "0";
+  return (await tryView<string>(classic(), "get_pool_shares", { pool_id: poolId, account_id: account })) ?? "0";
 }
 
 /** Owner of a DCL liquidity position. */
 export async function positionOwner(lptId: string): Promise<string | null> {
-  const r = await tryView<{ owner_id: string }>(DCL, "get_liquidity", { lpt_id: lptId });
+  const r = await tryView<{ owner_id: string }>(dcl(), "get_liquidity", { lpt_id: lptId });
   return r?.owner_id ?? null;
 }

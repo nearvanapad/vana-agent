@@ -1,4 +1,4 @@
-import { CLASSIC, DCL } from "./rhea";
+import { net } from "../near/network";
 import { mapLimit, postJson } from "./http";
 
 /**
@@ -7,7 +7,7 @@ import { mapLimit, postJson } from "./http";
  * come from those logs, which is how early buyers and wallet origins are read.
  */
 
-const API = "https://tx.main.fastnear.com/v0";
+const API = () => net().fastnearTx;
 const BATCH = 20;
 
 function headers(): Record<string, string> {
@@ -15,7 +15,7 @@ function headers(): Record<string, string> {
   return key ? { authorization: `Bearer ${key}` } : {};
 }
 
-const post = <T>(path: string, body: unknown) => postJson<T>(`${API}${path}`, body, { headers: headers(), attempts: 4, timeoutMs: 20_000 });
+const post = <T>(path: string, body: unknown) => postJson<T>(`${API()}${path}`, body, { headers: headers(), attempts: 4, timeoutMs: 20_000 });
 
 export type AccountTx = { hash: string; at_ms: number; is_signer: boolean };
 
@@ -95,4 +95,4 @@ export function ftEvents(txs: RawTx[], token: string): FtEvent[] {
   return out.sort((a, b) => a.at_ms - b.at_ms || (a.tx === b.tx ? a.seq - b.seq : 0));
 }
 
-export const isPool = (account: string | null) => account === DCL || account === CLASSIC;
+export const isPool = (account: string | null) => account === net().dcl || account === net().classic;

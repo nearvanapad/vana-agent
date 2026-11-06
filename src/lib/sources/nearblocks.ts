@@ -1,14 +1,15 @@
+import { explorer, net } from "../near/network";
 import { getJson, sourced, type Sourced } from "./http";
 
-const API = "https://api.nearblocks.io/v1";
-const SITE = "https://nearblocks.io";
+const API = () => net().nearblocksApi;
+const SITE = () => explorer("");
 
 function headers(): Record<string, string> {
   const key = process.env.NEARBLOCKS_API_KEY;
   return key ? { authorization: `Bearer ${key}` } : {};
 }
 
-const get = <T>(path: string) => getJson<T>(`${API}${path}`, { headers: headers() });
+const get = <T>(path: string) => getJson<T>(`${API()}${path}`, { headers: headers() });
 
 export type Holder = { account: string; amount: string };
 
@@ -20,13 +21,13 @@ export async function holders(token: string, perPage = 25): Promise<Sourced<Hold
   return sourced(
     r.holders.map((h) => ({ account: h.account, amount: String(h.amount) })),
     "NearBlocks",
-    `${SITE}/token/${token}?tab=holders`,
+    `${SITE()}/token/${token}?tab=holders`,
   );
 }
 
 export async function holderCount(token: string): Promise<Sourced<number>> {
   const r = await get<{ holders: { count: string }[] }>(`/fts/${encodeURIComponent(token)}/holders/count`);
-  return sourced(Number(r.holders[0]?.count ?? 0), "NearBlocks", `${SITE}/token/${token}?tab=holders`);
+  return sourced(Number(r.holders[0]?.count ?? 0), "NearBlocks", `${SITE()}/token/${token}?tab=holders`);
 }
 
 export type AccountOrigin = {
@@ -49,6 +50,6 @@ export async function accountOrigin(account: string): Promise<Sourced<AccountOri
       tx: t?.transaction_hash ?? null,
     },
     "NearBlocks",
-    t ? `${SITE}/txns/${t.transaction_hash}` : `${SITE}/address/${account}`,
+    t ? `${SITE()}/txns/${t.transaction_hash}` : `${SITE()}/address/${account}`,
   );
 }
