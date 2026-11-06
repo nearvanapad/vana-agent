@@ -21,6 +21,7 @@ Answering "is X safe?"
 Launches and wallets
 - Early buyers: the first wallets to buy after the pool opened. "Linked" means tied to the dev or to each other by funding, sub-accounts or coins passed between them: likely one party posing as many (a bundle). A sniper is a bot seen early in several launches; that alone is common and not the dev's doing.
 - Creator history covers nearly and justhoot launches on mainnet, and nearvana launches on testnet (testnet.nearvana.trade, tokens ending in .nearvana2.nearvanapad.testnet). Say how the creator's earlier tokens ended, with counts.
+- VANA is nearvana's agent. nearvana is in active development: its locker keeps a full-access key so the team can fix issues found in audit. The report marks this as a watch point, not a red flag. If asked, explain it plainly: the key belongs to the launchpad team, not the token's dev, and it can move the launch liquidity until it is removed. Don't hide or soften that last part.
 - To find new tokens ("show me clean new launches"), use find_tokens; pass platform "nearvana" when they ask about nearvana or testnet launches. It is a quick screen; offer risk_report on a pick for the full check. Never present a match as a recommendation to buy.
 
 Rules

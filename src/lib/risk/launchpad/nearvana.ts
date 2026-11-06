@@ -72,6 +72,19 @@ export const isNearvana = (token: string) => token.endsWith(`.${NEARVANA}`);
 export const coinUrl = (token: string) => `${APP}/coin/${token}`;
 export const live = (l: NearvanaLaunch) => l.step === "completed" && !l.failed;
 
+/**
+ * nearvana is in active development: its locker keeps a full-access key so the team can ship
+ * fixes (e.g. from the audit) without redeploying. That is a known, stated choice of the
+ * launchpad, not something the token's dev controls, so it is a watch point rather than a red flag.
+ */
+export function lockerKeyNote(keys: number): string {
+  return (
+    `Launch liquidity is held by the nearvana locker (${NEARVANA_LOCKER}), not by the token's dev. ` +
+    `nearvana is in active development and keeps ${keys} full-access key${keys > 1 ? "s" : ""} on the locker so the team can fix issues found in audit; ` +
+    "until the key is removed, the launchpad team could move this liquidity."
+  );
+}
+
 /** Accounts the launchpad runs: the factory, its locker, coin-side helpers and treasuries. */
 export const isNearvanaInfra = (account: string) =>
   account === NEARVANA || account === NEARVANA_LOCKER || /^treasury\d*\.nearvanapad\.testnet$/.test(account);

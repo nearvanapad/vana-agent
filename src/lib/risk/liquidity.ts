@@ -3,6 +3,7 @@ import { viewAccessKeys } from "../near/rpc";
 import { ref, refOf, type SourceRef, type Sourced } from "../sources/http";
 import { poolShares, positionOwner, prices, type Pool } from "../sources/rhea";
 import { isLaunchpadInfra } from "./launchpad";
+import { lockerKeyNote, NEARVANA_LOCKER } from "./launchpad/nearvana";
 import { byLevel, DEV_LP_RED_PCT, fmtPct, fmtUsd, LIQUIDITY_THIN_USD, pct, units, worst } from "./rules";
 import type { Check, Level, TokenInfo } from "./types";
 
@@ -148,6 +149,8 @@ async function lpControl(info: TokenInfo, pools: Pool[]) {
         findings.push({ level: "green", text: `Launch liquidity is locked in ${owner}, a launchpad locker with no keys.` });
       } else if (full === 0) {
         findings.push({ level: "green", text: `Launch liquidity is held by ${owner}, a contract with no keys.` });
+      } else if (owner === NEARVANA_LOCKER && full !== null) {
+        findings.push({ level: "yellow", text: lockerKeyNote(full) });
       } else {
         findings.push({ level: "red", text: `Launch liquidity is held by ${owner}, which has ${full ?? "unknown"} full-access key(s) and can withdraw it.` });
       }
