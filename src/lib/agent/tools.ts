@@ -1,6 +1,7 @@
 import { tool, type InferUITools } from "ai";
 import { z } from "zod";
 import { riskReport } from "../risk/report";
+import { findTokens } from "../risk/screen";
 import { units } from "../risk/rules";
 import type { Check, RiskReport } from "../risk/types";
 import { ref, refOf } from "../sources/http";
@@ -38,6 +39,9 @@ export function reportView(r: RiskReport) {
       platform: r.launchpad.platform,
       creator: r.launchpad.creator,
       created_at: r.launchpad.created_at,
+      state: r.launchpad.state,
+      quote: r.launchpad.quote,
+      dev_buy_near: r.launchpad.dev_buy,
       url: r.launchpad.url,
     },
     checks: r.checks.map(checkView),
@@ -92,7 +96,7 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
 
     risk_report: tool({
       description:
-        "Full risk check of a NEAR token: contract powers and keys, holder concentration and dev share, Rhea liquidity and who can pull it, and taxes. Each check is green, yellow, red or not_checked, with numbers and sources. The UI shows it as a card. Use this for any 'is X safe' question.",
+        "Full risk check of a NEAR token: contract powers and keys, holder concentration and dev share, early buyers and bundles (linked wallets, snipers), fresh wallets, Rhea liquidity and who can pull it, taxes, and the creator's earlier launches. Each check is green, yellow, red or not_checked, with numbers and sources. The UI shows it as a card. Use this for any 'is X safe' question. Takes up to ~30 s for a token not seen before.",
       inputSchema: z.object({
         token: tokenArg,
         fresh: z.boolean().optional().describe("Skip the 5-minute cache. Only when the user asks for fresh data."),
@@ -158,6 +162,50 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
       },
     }),
 
+    early_buyers: tool({
+      description:
+        "The first wallets to buy a token after its pool opened, how soon they bought, what they hold now, and whether they are linked to the dev or each other (same funder within two hops, funded by the dev, dev sub-accounts, coins passed between them). Flags sniper bots seen early in 3+ launches.",
+      inputSchema: z.object({ token: tokenArg }),
+      execute: async ({ token }) => {
+        const r = await riskReport(token);
+        const c = r.checks.find((x) => x.id === "early_buyers");
+        if (!c) return { token: r.token, note: "Not run for verified tokens: early-buyer forensics are for new launches." };
+        return { token: r.token, symbol: stranger(r.symbol, 16), dev: r.dev, ...checkView(c) };
+      },
+    }),
+
+    creator_history: tool({
+      description:
+        "The token creator's other launches on nearly and justhoot and how each ended: still trading, dead (sold back to the launch price, emptied pool, or no trades after day one), or sold off by the dev.",
+      inputSchema: z.object({ token: tokenArg }),
+      execute: async ({ token }) => {
+        const r = await riskReport(token);
+        const c = r.checks.find((x) => x.id === "creator")!;
+        return { token: r.token, symbol: stranger(r.symbol, 16), dev: r.dev, launchpad: r.launchpad?.platform ?? null, ...checkView(c) };
+      },
+    }),
+
+    find_tokens: tool({
+      description:
+        "Screen the newest nearly and justhoot launches (up to 20) with a quick risk check each and return those that pass: max overall level and checks that must be green. Quick means no early-buyer or fresh-wallet forensics; run risk_report on a pick for those. Takes up to ~40 s.",
+      inputSchema: z.object({
+        platform: z.enum(["nearly", "justhoot", "any"]).optional().describe("Default any."),
+        max_level: z.enum(["green", "yellow", "red"]).optional().describe("Worst overall level to keep. Default yellow."),
+        clean_checks: z
+          .array(z.enum(["contract", "holders", "liquidity", "taxes", "creator"]))
+          .max(5)
+          .optional()
+          .describe("Checks that must be green, e.g. ['holders', 'creator']."),
+        scan: z.number().int().min(1).max(20).optional().describe("How many of the newest launches to look at. Default 12."),
+        limit: z.number().int().min(1).max(10).optional().describe("How many matches to return. Default 5."),
+      }),
+      execute: async (args) => {
+        const r = await findTokens(args);
+        if (r.matches.length) guard.taint("creator-written token symbols");
+        return { ...r, matches: r.matches.map((m) => ({ ...m, symbol: stranger(m.symbol, 16) })) };
+      },
+    }),
+
     dev_profile: tool({
       description:
         "Who is behind a token: finds its dev (launchpad creator, contract owner or account creator) and profiles that account: age, who created it, keys, NEAR balance, holdings, and how much of the token it holds.",
@@ -174,7 +222,8 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
     }),
 
     wallet_profile: tool({
-      description: "Profile any NEAR account: age, who created it, fresh-wallet flag, keys, contract or not, NEAR balance and its largest token holdings in dollars.",
+      description:
+        "Profile any NEAR account: age, who created or first funded it, fresh-wallet flag, sniper flag (early buyer in several launches), keys, contract or not, NEAR balance and its largest token holdings in dollars.",
       inputSchema: z.object({ account: accountArg }),
       execute: async ({ account }) => {
         const p = await walletProfile(account.trim().toLowerCase());

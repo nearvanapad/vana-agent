@@ -1,5 +1,5 @@
 import * as fastnear from "../sources/fastnear";
-import { refOf, type SourceRef } from "../sources/http";
+import { refOf, type SourceRef, type Sourced } from "../sources/http";
 import * as nearblocks from "../sources/nearblocks";
 import { CLASSIC, DCL } from "../sources/rhea";
 import { isLaunchpadInfra } from "./launchpad";
@@ -22,25 +22,46 @@ function devLabel(account: string, dev: string | null): string | null {
   return null;
 }
 
-export async function holdersCheck(info: TokenInfo): Promise<Check> {
+export type HolderList = { list: nearblocks.Holder[]; count: Sourced<number> | null; sources: SourceRef[] };
+
+/** The largest holders (FastNEAR, NearBlocks as fallback) and the holder count. */
+export async function loadHolders(token: string): Promise<HolderList> {
   let list: nearblocks.Holder[];
   const sources: SourceRef[] = [];
   try {
-    const r = await fastnear.topHolders(info.token);
+    const r = await fastnear.topHolders(token);
     list = r.data;
     sources.push(refOf(r));
   } catch {
-    const r = await nearblocks.holders(info.token, 25);
+    const r = await nearblocks.holders(token, 25);
     list = r.data;
     sources.push(refOf(r));
   }
   // NearBlocks reports 0 for tokens it has not indexed yet: treat that as unknown
   const count = await nearblocks
-    .holderCount(info.token)
+    .holderCount(token)
     .then((c) => (c.data > 0 ? c : null))
     .catch(() => null);
   if (count) sources.push(refOf(count));
+  return { list, count, sources };
+}
 
+/** Holders that are people (not pools, lockers, burns), with their share and dev label. */
+export function people(info: TokenInfo, list: nearblocks.Holder[]): Wallet[] {
+  const supply = BigInt(info.total_supply);
+  const dev = info.dev?.account ?? null;
+  return list
+    .filter((h) => !infraLabel(h.account))
+    .map((h) => ({
+      account: h.account,
+      share_pct: pct(BigInt(h.amount), supply),
+      label: devLabel(h.account, dev) ?? (h.account === info.token ? "token contract" : undefined),
+    }));
+}
+
+export async function holdersCheck(info: TokenInfo, loaded: HolderList): Promise<Check> {
+  const { list, count } = loaded;
+  const sources = [...loaded.sources];
   const supply = BigInt(info.total_supply);
   const dev = info.dev?.account ?? null;
   const share = (amount: string) => pct(BigInt(amount), supply);

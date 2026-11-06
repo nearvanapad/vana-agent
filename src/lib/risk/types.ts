@@ -12,7 +12,7 @@ export type Wallet = {
 };
 
 export type Check = {
-  id: "contract" | "holders" | "liquidity" | "taxes";
+  id: "contract" | "holders" | "liquidity" | "taxes" | "early_buyers" | "fresh_wallets" | "creator";
   title: string;
   level: Level;
   /** The finding in one sentence. */
@@ -37,6 +37,12 @@ export type Launchpad = {
   pool_id: string | null;
   /** Whether the platform can replace the token's code or change its fee. */
   platform_upgradeable: boolean;
+  /** Where the launch stands, in a few words (e.g. "live, liquidity locked", "on the bonding curve"). */
+  state: string | null;
+  /** The token the pool pairs with (wrap.near, a stablecoin, another launch token). */
+  quote: string | null;
+  /** What the creator bought at launch, in the quote token's units. */
+  dev_buy: number | null;
   url: string;
   source: SourceRef;
 };
@@ -60,6 +66,8 @@ export type RiskReport = TokenInfo & {
   level: Level;
   summary: string;
   checks: Check[];
+  /** A screening report: the wallet forensics were skipped. */
+  quick: boolean;
   as_of: string;
   took_ms: number;
   cached: boolean;

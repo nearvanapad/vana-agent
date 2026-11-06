@@ -68,22 +68,32 @@ export async function getJson<T>(
 }
 
 /**
- * POST JSON once (no retry: a quote or a submit must not be sent twice). A non-2xx answer throws
- * an HttpError carrying the body's `message` when it has one.
+ * POST JSON. Sent once by default: a quote or a submit must not be sent twice. Read-only queries
+ * pass `attempts` to retry rate limits and gateway errors. A non-2xx answer throws an HttpError
+ * carrying the body's `message` when it has one.
  */
-export async function postJson<T>(url: string, body: unknown, opts: { headers?: Record<string, string>; timeoutMs?: number } = {}): Promise<T> {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { accept: "application/json", "content-type": "application/json", ...opts.headers },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(opts.timeoutMs ?? 20_000),
-  });
-  const json = (await res.json().catch(() => null)) as (T & { message?: unknown }) | null;
-  if (!res.ok || json === null) {
-    const msg = json && typeof json.message === "string" ? json.message : `${res.status} from ${new URL(url).host}`;
-    throw new HttpError(msg, res.status, url);
+export async function postJson<T>(
+  url: string,
+  body: unknown,
+  opts: { headers?: Record<string, string>; timeoutMs?: number; attempts?: number } = {},
+): Promise<T> {
+  const attempts = opts.attempts ?? 1;
+  for (let i = 0; ; i++) {
+    if (i > 0) await sleep(800 * 2 ** (i - 1) + Math.random() * 300);
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { accept: "application/json", "content-type": "application/json", ...opts.headers },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 20_000),
+    });
+    if (RETRY_STATUS.has(res.status) && i + 1 < attempts) continue;
+    const json = (await res.json().catch(() => null)) as (T & { message?: unknown }) | null;
+    if (!res.ok || json === null) {
+      const msg = json && typeof json.message === "string" ? json.message : `${res.status} from ${new URL(url).host}`;
+      throw new HttpError(msg, res.status, url);
+    }
+    return json;
   }
-  return json;
 }
 
 /** Runs `fn` over `items` with at most `limit` in flight. */

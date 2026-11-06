@@ -22,6 +22,8 @@ function print(r: RiskReport) {
   for (const c of r.checks) {
     console.log(`  ${DOT[c.level]} ${c.title}: ${c.summary}`);
     for (const f of c.findings) console.log(`      ${DOT[f.level]} ${f.text}`);
+    if (c.id === "early_buyers" || c.id === "creator" || c.id === "fresh_wallets")
+      for (const w of c.wallets?.slice(0, 6) ?? []) console.log(`        · ${w.account}${w.share_pct !== undefined ? ` ${w.share_pct}%` : ""} ${w.label ?? ""}`);
     console.log(`      sources: ${c.sources.map((s) => `${s.source} ${s.url}`).join(" | ") || "-"}`);
   }
 }

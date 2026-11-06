@@ -110,6 +110,23 @@ Checked against mainnet on 2 Nov 2026. Each section answers what the risk check 
   - `/tokens/{id}` returns price, mcap, volume, `holder_count`, `trade_count`, buy/sell counts, `first_trade_at`, `graduated`.
   - `/trades?…`, `/pools/{id}` and `/accounts/{id}/trades` are useful for early buyers and creator history.
 
-## Gaps to close in later phases
-- Re-probe 1Click (`/tokens`, dry `/quote`) once it is back up. This is a blocker for Phase 3 only.
-- Find the nearly launch's first DCL swaps (early buyers) using NearBlocks FT txns with `order=asc` on the token, after the launch `created_at_ms`.
+## FastNEAR transactions API — `https://tx.main.fastnear.com/v0` (probed 6 Nov)
+
+The source for early buyers and wallet origins. Full history (back to 2022 for `token.sweat`).
+- `POST /account {account_id, desc, limit}` lists every transaction that touched the account: `{account_txs:[{transaction_hash, tx_block_timestamp, is_signer, is_receiver, …}], txs_count, resume_token}`. With `desc:false`, the first row is the account's creation or first funding.
+- `POST /transactions {tx_hashes:[…]}` returns full transactions with every receipt's logs, in no particular order. Sort by block timestamp.
+- Token events are NEP-141 `EVENT_JSON` logs (`ft_mint`, `ft_transfer`) from receipts the token executes. A buy from a pool is an `ft_transfer` whose `old_owner_id` is `dclv2.ref-labs.near` or `v2.ref-finance.near`. nearly's tax shows as a transfer to the token account itself.
+- Keyless use is rate-limited in bursts (nginx 429 on `/transactions`): retry with backoff. Send `FASTNEAR_API_KEY` when set.
+- **NearBlocks does not index FT events for launchpad tokens** (`/fts/{token}/txns` is empty for nearly tokens), and keyless NearBlocks hits its limit after about 10 calls. It is only a fallback now.
+
+## Launch lists and creator history
+
+- nearly: `get_launches({from_index, limit})` caps `limit` at 200, newest first. 3678 launches take 19 pages. There is no by-creator view, so the app builds the list and filters it (kept 15 min).
+  - `quote` is not always `wrap.near`: some launches pair with another token (e.g. `ainear.nearlyops.near`).
+  - `dev_buy_near` is what the creator spent at launch. `dev_buy_tokens` reads 0 even after a dev buy, so "dev sold" is judged by the creator's current balance.
+  - The DCL pool's `current_point` back at the launch range edge (`left_point` for token-is-x) means the price is back at launch: every buy was sold.
+- justhoot API (`https://api.justhoot.fun/api`):
+  - `/rooms?sort=new|mcap|volume|last&limit&offset&creator=<id>`: launches with `creator_id`, `created_at`, market cap, all-time-high market cap, holder and trade counts, `last_trade_at`, `graduated`.
+  - `/tokens/{id}`: `first_trade_at`, `graduated`, 24 h stats.
+  - `/accounts/{id}/trades?limit=200`: an account's trades (buy/sell, token amount), used for dev sells.
+- Early buyers seen on many launches (64-hex accounts funded through `intents.near`, the `*.sendler-b.near` group) are sniper bots. The app keeps each launch's early buyers in `early_buys`; an account early in 3+ launches is flagged.

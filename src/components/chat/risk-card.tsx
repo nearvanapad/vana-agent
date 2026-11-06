@@ -65,21 +65,25 @@ export function RiskCard({ report }: { report: ReportView }) {
                     ))}
                   </ul>
                   {c.wallets && c.wallets.length > 0 && (
-                    <table className="w-full text-xs">
-                      <tbody>
-                        {c.wallets.map((w) => (
-                          <tr key={w.account} className="border-t border-line/60">
-                            <td className="max-w-0 truncate py-1 pr-2 font-mono">
-                              <a href={`https://nearblocks.io/address/${w.account}`} target="_blank" rel="noopener noreferrer nofollow" className="hover:text-accent">
-                                {w.account}
-                              </a>
-                            </td>
-                            <td className="py-1 pr-2 text-text-2">{w.label}</td>
-                            <td className="py-1 text-right font-mono">{w.share_pct !== undefined ? `${w.share_pct.toFixed(2)}%` : ""}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <ul className="text-xs">
+                      {c.wallets.map((w) => (
+                        <li key={w.account} className="border-t border-line/60 py-1">
+                          <div className="flex items-baseline gap-2">
+                            <a
+                              href={`https://nearblocks.io/address/${w.account}`}
+                              target="_blank"
+                              rel="noopener noreferrer nofollow"
+                              className="min-w-0 flex-1 truncate font-mono hover:text-accent"
+                              title={w.account}
+                            >
+                              {w.account}
+                            </a>
+                            {w.share_pct !== undefined && <span className="shrink-0 font-mono">{w.share_pct.toFixed(2)}%</span>}
+                          </div>
+                          {w.label && <div className="text-text-2">{w.label}</div>}
+                        </li>
+                      ))}
+                    </ul>
                   )}
                   <Sources sources={c.sources} />
                 </div>

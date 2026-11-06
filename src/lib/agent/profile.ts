@@ -1,11 +1,11 @@
-import { cached } from "../db";
+import { getDb } from "../db";
 import { EXPLORER_ACCOUNT, YOCTO } from "../near/config";
 import { contractHash, RpcError, viewAccessKeys, viewAccount } from "../near/rpc";
 import { infraLabel } from "../risk/holders";
-import { FRESH_MAX_AGE_DAYS, units } from "../risk/rules";
+import { ageDays, origin, originSource } from "../risk/wallets";
+import { FRESH_MAX_AGE_DAYS, SNIPER_LAUNCHES, units } from "../risk/rules";
 import * as fastnear from "../sources/fastnear";
 import { ref, type SourceRef } from "../sources/http";
-import * as nearblocks from "../sources/nearblocks";
 import { prices } from "../sources/rhea";
 import { stranger } from "./guard";
 
@@ -33,6 +33,9 @@ export type WalletProfile = {
   holdings_usd: number;
   /** Tokens it holds that Rhea has no price for. */
   unpriced_tokens: number;
+  /** Launches this app has seen it buy among the first wallets, and whether that makes it a sniper. */
+  early_buyer_in: number;
+  sniper: boolean;
   sources: SourceRef[];
 };
 
@@ -42,16 +45,18 @@ export async function walletProfile(account: string): Promise<WalletProfile> {
     if (e instanceof RpcError && e.kind === "UNKNOWN_ACCOUNT") throw new AccountNotFound(account);
     throw e;
   });
-  const [keys, origin, tokens, px] = await Promise.all([
+  const [keys, o, tokens, px] = await Promise.all([
     viewAccessKeys(account),
-    // Creation never changes, so it is kept for good.
-    cached(`origin:${account}`, null, () => nearblocks.accountOrigin(account).then((r) => r.data)).catch(() => null),
+    origin(account).catch(() => null),
     fastnear.accountTokens(account).catch(() => null),
     prices().catch(() => null),
   ]);
 
+  const early = (
+    getDb().prepare("SELECT COUNT(*) AS n FROM early_buys WHERE account = ?").get(account) as { n: number }
+  ).n;
   const full = keys.filter((k) => k.access_key.permission === "FullAccess").length;
-  const age = origin?.created_at ? (Date.now() - Date.parse(origin.created_at)) / 86_400_000 : null;
+  const age = ageDays(o);
 
   const holdings: WalletProfile["holdings"] = [];
   let unpriced = 0;
@@ -67,7 +72,7 @@ export async function walletProfile(account: string): Promise<WalletProfile> {
   holdings.sort((a, b) => b.usd - a.usd);
 
   const sources: SourceRef[] = [ref("NEAR RPC", `${EXPLORER_ACCOUNT}${account}`)];
-  if (origin?.tx) sources.push(ref("NearBlocks", `https://nearblocks.io/txns/${origin.tx}`));
+  if (o?.tx) sources.push(originSource(o));
   if (tokens) sources.push(ref(tokens.source, tokens.url, new Date(tokens.as_of)));
   if (px && holdings.length) sources.push(ref(px.source, px.url, new Date(px.as_of)));
 
@@ -78,13 +83,15 @@ export async function walletProfile(account: string): Promise<WalletProfile> {
     is_contract: contractHash(acc) !== null,
     full_access_keys: full,
     limited_keys: keys.length - full,
-    created_by: origin?.creator ?? null,
-    created_at: origin?.created_at ?? null,
+    created_by: o?.funder ?? null,
+    created_at: o?.created_at ?? null,
     age_days: age === null ? null : Math.floor(age),
     fresh: age === null ? null : age < FRESH_MAX_AGE_DAYS,
     holdings: holdings.slice(0, 10),
     holdings_usd: round(holdings.reduce((s, h) => s + h.usd, 0)),
     unpriced_tokens: unpriced,
+    early_buyer_in: early,
+    sniper: early >= SNIPER_LAUNCHES,
     sources,
   };
 }

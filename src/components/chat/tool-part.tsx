@@ -17,13 +17,19 @@ export function toolLabel(name: string, input: Input, done = false): string {
   const v = (doing: string, did: string) => (done ? did : doing);
   switch (name) {
     case "risk_report":
-      return v(`Checking ${t || "the token"}: contract, holders, liquidity, taxes`, `Checked ${t}`);
+      return v(`Checking ${t || "the token"}: contract, holders, early buyers, liquidity, taxes, creator`, `Checked ${t}`);
     case "token_overview":
       return v(`Looking up ${t}`, `Looked up ${t}`);
     case "holders":
       return v(`Reading the holders of ${t}`, `Read the holders of ${t}`);
     case "liquidity":
       return v(`Reading Rhea pools for ${t}`, `Read Rhea pools for ${t}`);
+    case "early_buyers":
+      return v(`Tracing the early buyers of ${t}`, `Traced the early buyers of ${t}`);
+    case "creator_history":
+      return v(`Looking up the creator's other launches for ${t}`, `Looked up the creator's other launches for ${t}`);
+    case "find_tokens":
+      return v("Screening the newest nearly and justhoot launches", "Screened the newest launches");
     case "dev_profile":
       return v(`Looking into the dev of ${t}`, `Looked into the dev of ${t}`);
     case "wallet_profile":

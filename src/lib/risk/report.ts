@@ -1,19 +1,21 @@
-import { cached, getDb } from "../db";
+import { getDb, kv } from "../db";
 import { view } from "../near/rpc";
-import * as nearblocks from "../sources/nearblocks";
 import { poolsFor, whitelist } from "../sources/rhea";
 import { contractCheck, loadContract, type ContractFacts } from "./contract";
-import { holdersCheck } from "./holders";
+import { bundleCheck } from "./bundle";
+import { creatorCheck } from "./creator";
+import { holdersCheck, loadHolders, people } from "./holders";
 import { detectLaunchpad } from "./launchpad";
 import { liquidityCheck } from "./liquidity";
 import { byLevel, REPORT_TTL_MS, worst } from "./rules";
 import { taxesCheck } from "./taxes";
 import type { Check, RiskReport, TokenInfo } from "./types";
+import { freshCheck, origin } from "./wallets";
 
 /**
- * The risk report: four fixed checks (contract, holders, liquidity, taxes), each green, yellow,
- * red or not_checked, with the numbers and sources behind it. Same input, same rules, every time.
- * Kept in SQLite for `REPORT_TTL_MS`.
+ * The risk report: fixed checks (contract, holders, early buyers, fresh wallets, liquidity, taxes,
+ * creator history), each green, yellow, red or not_checked, with the numbers and sources behind it.
+ * Same input, same rules, every time. Kept in SQLite for `REPORT_TTL_MS`.
  */
 
 const NEAR_ACCOUNT = /^(([a-z\d]+[-_])*[a-z\d]+\.)*([a-z\d]+[-_])*[a-z\d]+$/;
@@ -38,9 +40,9 @@ async function tokenInfo(token: string, facts: ContractFacts): Promise<TokenInfo
   if (launchpad) dev = { account: launchpad.creator, via: "launchpad" };
   else if (facts.owner) dev = { account: facts.owner.account, via: "owner" };
   else {
-    // Who created the token account. Never changes, so it is kept for good.
-    const origin = await cached(`origin:${token}`, null, () => nearblocks.accountOrigin(token).then((r) => r.data)).catch(() => null);
-    if (origin?.creator && origin.creator !== token) dev = { account: origin.creator, via: "creator" };
+    // Who created the token account.
+    const o = await origin(token).catch(() => null);
+    if (o?.funder && o.funder !== token) dev = { account: o.funder, via: "creator" };
   }
 
   return {
@@ -82,25 +84,41 @@ function overallSummary(r: Pick<RiskReport, "level" | "checks" | "symbol" | "tok
   return `${head} ${body}${tail}`.trim();
 }
 
-export async function buildReport(token: string): Promise<RiskReport> {
+/** Quick reports skip the wallet forensics (early buyers, fresh wallets); used to screen many tokens. */
+export type ReportOpts = { fresh?: boolean; quick?: boolean };
+
+export async function buildReport(token: string, opts: { quick?: boolean } = {}): Promise<RiskReport> {
   const started = Date.now();
   const facts = await loadContract(token);
   const info = await tokenInfo(token, facts);
   const pools = poolsFor(token, info.launchpad?.pool_id ? [info.launchpad.pool_id] : []).catch(() => null);
+  const loaded = loadHolders(token);
+  const deep = !opts.quick;
 
-  const [holders, liquidity, taxes] = await Promise.all([
-    holdersCheck(info).catch((e) => failed("holders", "Holders", e)),
+  const [holders, early, fresh, liquidity, taxes, creator] = await Promise.all([
+    loaded.then((l) => holdersCheck(info, l)).catch((e) => failed("holders", "Holders", e)),
+    deep && !info.verified
+      ? loaded
+          .catch(() => ({ list: [] }))
+          .then((l) => bundleCheck(info, l.list))
+          .catch((e) => failed("early_buyers", "Early buyers", e))
+      : null,
+    deep
+      ? loaded.then((l) => freshCheck(people(info, l.list))).catch((e) => failed("fresh_wallets", "Fresh wallets", e))
+      : null,
     pools
       .then((p) => (p ? liquidityCheck(info, p) : failed("liquidity", "Liquidity", "Rhea pools unavailable")))
       .catch((e) => failed("liquidity", "Liquidity", e)),
     pools.then((p) => taxesCheck(info, facts, p?.data ?? [])).catch((e) => failed("taxes", "Taxes", e)),
+    creatorCheck(info).catch((e) => failed("creator", "Creator history", e)),
   ]);
-  const checks = [contractCheck(facts, { verified: info.verified, launchpad: info.launchpad }), holders, liquidity, taxes];
+  const checks = [contractCheck(facts, { verified: info.verified, launchpad: info.launchpad }), holders, early, fresh, liquidity, taxes, creator].filter(
+    (c): c is Check => c !== null,
+  );
   // Verified issuer tokens (stablecoins, project tokens) keep most supply in treasuries by design.
-  const holdersCheck0 = checks[1]!;
-  if (info.verified && holdersCheck0.level === "red") {
-    holdersCheck0.level = "yellow";
-    holdersCheck0.findings.push({ level: "green", text: "Rhea lists it as verified: issuer treasuries often hold most of the supply." });
+  if (info.verified && holders.level === "red") {
+    holders.level = "yellow";
+    holders.findings.push({ level: "green", text: "Rhea lists it as verified: issuer treasuries often hold most of the supply." });
   }
   const level = worst(checks.map((c) => c.level));
   const report: RiskReport = {
@@ -108,6 +126,7 @@ export async function buildReport(token: string): Promise<RiskReport> {
     level,
     summary: "",
     checks,
+    quick: Boolean(opts.quick),
     as_of: new Date().toISOString(),
     took_ms: Date.now() - started,
     cached: false,
@@ -116,8 +135,8 @@ export async function buildReport(token: string): Promise<RiskReport> {
   return report;
 }
 
-/** The report for `input`, from the cache when fresh. `fresh` forces a new one. */
-export async function riskReport(input: string, opts: { fresh?: boolean } = {}): Promise<RiskReport> {
+/** The report for `input`, from the cache when fresh. `fresh` forces a new one. A full report also answers a quick one. */
+export async function riskReport(input: string, opts: ReportOpts = {}): Promise<RiskReport> {
   const token = normalizeToken(input);
   const db = getDb();
   if (!opts.fresh) {
@@ -125,8 +144,16 @@ export async function riskReport(input: string, opts: { fresh?: boolean } = {}):
       | { json: string; created_at: number }
       | undefined;
     if (row && Date.now() - row.created_at < REPORT_TTL_MS) return { ...(JSON.parse(row.json) as RiskReport), cached: true };
+    if (opts.quick) {
+      const hit = kv.get<RiskReport>(`quick:${token}`);
+      if (hit) return { ...hit, cached: true };
+    }
   }
-  const report = await buildReport(token);
+  const report = await buildReport(token, { quick: opts.quick });
+  if (opts.quick) {
+    kv.set(`quick:${token}`, report, REPORT_TTL_MS);
+    return report;
+  }
   db.prepare("INSERT OR REPLACE INTO reports (token, level, json, created_at) VALUES (?, ?, ?, ?)").run(
     token,
     report.level,

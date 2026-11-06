@@ -60,6 +60,16 @@ const MIGRATIONS = [
      updated_at INTEGER NOT NULL
    );
    CREATE INDEX swaps_account ON swaps (account, created_at DESC);`,
+  // Early buyers per launch, kept once the launch window has passed. An account early in several
+  // launches is a sniper.
+  `CREATE TABLE early_buys (
+     token TEXT NOT NULL,
+     account TEXT NOT NULL,
+     rank INTEGER NOT NULL,
+     at_ms INTEGER NOT NULL,
+     PRIMARY KEY (token, account)
+   );
+   CREATE INDEX early_buys_account ON early_buys (account);`,
 ];
 
 let db: Database.Database | null = null;

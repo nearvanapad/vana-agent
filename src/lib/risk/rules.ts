@@ -26,6 +26,25 @@ export const TAX_RED_PCT = 10;
 
 /** A wallet younger than this is fresh. */
 export const FRESH_MAX_AGE_DAYS = 7;
+/** Supply held by fresh wallets among the top holders. */
+export const FRESH_YELLOW_PCT = 3;
+export const FRESH_RED_PCT = 10;
+
+/** A funder with this many transactions funds strangers (exchange, relayer): sharing it links no one. */
+export const HUB_MIN_TXS = 20_000;
+
+/** Early buyers: the first N wallets to buy from a pool, plus any that bought this soon after it opened. */
+export const EARLY_BUYERS = 20;
+export const EARLY_WINDOW_S = 10;
+/** Early buyers tied to the dev or each other: red at this many, or at this share of supply between them. */
+export const BUNDLE_RED_WALLETS = 3;
+export const BUNDLE_RED_PCT = 5;
+/** An early buyer in this many launches is a sniper bot. */
+export const SNIPER_LAUNCHES = 3;
+
+/** Creator history: a past launch that sold off or emptied counts against the creator. */
+export const DEAD_POOL_USD = 50;
+export const CREATOR_RED_BAD = 2;
 
 /** How long a report is kept before it is computed again. */
 export const REPORT_TTL_MS = 5 * 60_000;
