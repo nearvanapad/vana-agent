@@ -5,7 +5,10 @@ COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+# Public settings are baked into the browser bundle at build time.
 ARG NEXT_PUBLIC_NEAR_RPC_URL=https://rpc.mainnet.fastnear.com
+ARG NEXT_PUBLIC_DEMO_TOKEN=
+ENV NEXT_PUBLIC_NEAR_RPC_URL=$NEXT_PUBLIC_NEAR_RPC_URL NEXT_PUBLIC_DEMO_TOKEN=$NEXT_PUBLIC_DEMO_TOKEN
 RUN pnpm build
 
 FROM node:24-alpine

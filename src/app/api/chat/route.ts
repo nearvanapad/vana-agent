@@ -75,7 +75,8 @@ export async function POST(req: Request) {
     tools,
     stopWhen: isStepCount(8),
     prepareStep: () => ({ activeTools: guard.active(names) }),
-    ...(think ? { reasoning: "high" as const } : {}),
+    // Normal mode answers from tool results and should be quick; Think mode takes its time.
+    reasoning: think ? "high" : "low",
     abortSignal: req.signal,
     timeout: { totalMs: 240_000, toolMs: 60_000 },
     maxRetries: 1,

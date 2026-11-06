@@ -7,10 +7,35 @@ import { Loader2, Menu, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "@/components/session/use-session";
 import { ConnectButton } from "@/components/wallet/connect-button";
+import Image from "next/image";
 import { ChatView } from "./chat-view";
 import { ConversationList, type ConversationItem } from "./conversation-list";
+import vana from "./vana.gif";
+
+/** The animated Vana mark next to the name. */
+function Logo({ size }: { size: number }) {
+  return <Image src={vana} alt="" width={size} height={size} unoptimized className="shrink-0" style={{ width: size, height: size }} />;
+}
 
 const newId = () => crypto.randomUUID();
+
+const LAST = "vana:last-chat";
+
+/** The chat this browser had open, so a reload brings it back. Storage can be blocked: then it is just forgotten. */
+function remembered(): string | null {
+  try {
+    return localStorage.getItem(LAST);
+  } catch {
+    return null;
+  }
+}
+
+function remember(id: string | null) {
+  try {
+    if (id) localStorage.setItem(LAST, id);
+    else localStorage.removeItem(LAST);
+  } catch {}
+}
 
 /** The whole app: conversation list, the open chat, and the wallet. */
 export function ChatApp() {
@@ -22,9 +47,14 @@ export function ChatApp() {
   const [menu, setMenu] = useState(false);
 
   useEffect(() => {
+    // A link names the chat; otherwise reopen the one this browser had open last.
     const fromUrl = new URLSearchParams(location.search).get("c");
+    const last = remembered();
     if (fromUrl) setActive(fromUrl);
-    else {
+    else if (last) {
+      setActive(last);
+      history.replaceState(null, "", `?c=${last}`);
+    } else {
       const id = newId();
       setLocal((s) => new Set(s).add(id));
       setActive(id);
@@ -35,6 +65,7 @@ export function ChatApp() {
     setActive(id);
     setMenu(false);
     history.replaceState(null, "", `?c=${id}`);
+    remember(id);
   }, []);
 
   const startNew = useCallback(() => {
@@ -43,6 +74,7 @@ export function ChatApp() {
     setActive(id);
     setMenu(false);
     history.replaceState(null, "", location.pathname);
+    remember(null);
   }, []);
 
   const list = useQuery({
@@ -90,13 +122,18 @@ export function ChatApp() {
 
   // Remember the URL of a new chat once its first message is sent.
   const onFirstSend = useCallback(() => {
-    if (active) history.replaceState(null, "", `?c=${active}`);
+    if (!active) return;
+    history.replaceState(null, "", `?c=${active}`);
+    remember(active);
   }, [active]);
 
   return (
     <div className="flex min-h-dvh">
       <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-surface/40 p-3 md:flex">
-        <h1 className="mb-4 px-1 pt-1 font-display text-2xl tracking-wide text-accent">VANA</h1>
+        <h1 className="mb-4 flex items-center gap-2 px-1 pt-1 font-display text-2xl tracking-wide text-accent">
+          <Logo size={36} />
+          VANA
+        </h1>
         {sidebar}
       </aside>
 
@@ -105,7 +142,10 @@ export function ChatApp() {
           <Dialog.Overlay className="fixed inset-0 z-40 bg-void/70 md:hidden" />
           <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-line bg-bg p-3 md:hidden">
             <div className="mb-4 flex items-center justify-between">
-              <Dialog.Title className="px-1 font-display text-2xl tracking-wide text-accent">VANA</Dialog.Title>
+              <Dialog.Title className="flex items-center gap-2 px-1 font-display text-2xl tracking-wide text-accent">
+                <Logo size={36} />
+                VANA
+              </Dialog.Title>
               <Dialog.Close className="rounded p-1.5 text-text-2 hover:bg-surface-2" aria-label="Close menu">
                 <X size={18} />
               </Dialog.Close>
@@ -122,7 +162,10 @@ export function ChatApp() {
             <button type="button" onClick={() => setMenu(true)} className="rounded p-1.5 text-text-2 hover:bg-surface-2 md:hidden" aria-label="Open menu">
               <Menu size={20} />
             </button>
-            <span className="font-display text-xl tracking-wide text-accent md:hidden">VANA</span>
+            <span className="flex items-center gap-1.5 font-display text-xl tracking-wide text-accent md:hidden">
+              <Logo size={28} />
+              VANA
+            </span>
           </div>
           <ConnectButton />
         </header>

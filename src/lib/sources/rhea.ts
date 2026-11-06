@@ -155,15 +155,22 @@ async function likelyDclPools(token: string, extra: string[]): Promise<string[]>
  * which may be newer than the index. When the index can't be built, falls back to DCL pools
  * against the common quotes, and says so in `partial`.
  */
-/** Classic pools created since the index was built that hold `token` (a fresh launch's first pool). */
-async function newClassicPools(idx: PoolIndex, token: string): Promise<Pool[]> {
-  if (idx.classic_count === undefined) return [];
+/**
+ * Classic pools created since `after` that hold `token`: a fresh launch's first pool. Without an
+ * index it reads the newest page of pools, which is where a new token's pool sits.
+ */
+async function newClassicPools(idx: PoolIndex | null, token: string): Promise<Pool[]> {
+  if (idx && idx.classic_count === undefined) return [];
   const now = await tryView<number>(classic(), "get_number_of_pools").catch(() => null);
-  if (!now || now <= idx.classic_count) return [];
-  const from = Math.max(idx.classic_count, now - PAGE);
+  const after = idx?.classic_count ?? 0;
+  if (!now || now <= after) return [];
+  const from = Math.max(after, now - PAGE);
   const raw = await tryView<ClassicPoolRaw[]>(classic(), "get_pools", { from_index: from, limit: now - from }).catch(() => null);
   return (raw ?? []).map((p, i) => classicPool(from + i, p)).filter((p) => p.tokens.includes(token) && p.amounts.some((a) => a !== "0"));
 }
+
+/** Builds the pool index ahead of the first question (on server start, then before it expires). */
+export const warmPools = () => poolIndex().then(() => undefined);
 
 export async function poolsFor(token: string, knownDcl: string[] = []): Promise<Sourced<Pool[]> & { partial: boolean }> {
   const idx = await poolIndex().catch(() => null);
@@ -174,7 +181,9 @@ export async function poolsFor(token: string, knownDcl: string[] = []): Promise<
     const extra = knownDcl.filter((id) => !indexed.some((p) => p.id === id));
     refs = [...indexed, ...extra.map((id) => ({ kind: "dcl" as const, id }))];
   } else {
-    refs = (await likelyDclPools(token, knownDcl)).map((id) => ({ kind: "dcl" as const, id }));
+    const [dclIds, recent] = await Promise.all([likelyDclPools(token, knownDcl), newClassicPools(null, token)]);
+    indexed = recent;
+    refs = [...recent, ...dclIds.map((id) => ({ kind: "dcl" as const, id }))];
   }
 
   if (idx && refs.length > FRESH_POOLS) {

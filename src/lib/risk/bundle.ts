@@ -8,6 +8,7 @@ import type { Holder } from "../sources/nearblocks";
 import { infraLabel } from "./holders";
 import { recentRooms } from "./launchpad/justhoot";
 import { recentLaunches } from "./launchpad/nearly";
+import * as nearvana from "./launchpad/nearvana";
 import {
   BUNDLE_RED_PCT,
   BUNDLE_RED_WALLETS,
@@ -90,22 +91,33 @@ export async function earlyBuyers(token: string): Promise<EarlyData> {
 
 /** Launches the sniper index needs before it says anything. */
 const INDEX_MIN = 10;
-let warming: Promise<void> | null = null;
+const warming: Record<string, Promise<void>> = {};
 
-/** Fills a cold sniper index with the early buyers of the newest launches on both launchpads. */
+/**
+ * Fills a cold sniper index with the early buyers of the newest launches on the current network's
+ * launchpads: nearly and justhoot on mainnet, nearvana on testnet.
+ */
 export function warmIndex(): Promise<void> {
-  // The launchpads are on mainnet; a testnet token has nothing to warm from.
-  if (net().id !== "mainnet") return Promise.resolve();
-  const have = (getDb().prepare("SELECT COUNT(DISTINCT token) AS n FROM early_buys").get() as { n: number }).n;
+  const testnet = net().id !== "mainnet";
+  const have = (
+    getDb()
+      .prepare(`SELECT COUNT(DISTINCT token) AS n FROM early_buys WHERE token ${testnet ? "" : "NOT "}LIKE '%.testnet'`)
+      .get() as { n: number }
+  ).n;
   if (have >= INDEX_MIN) return Promise.resolve();
-  warming ??= (async () => {
-    const [nearly, hoot] = await Promise.all([recentLaunches(8).catch(() => []), recentRooms(5).catch(() => [])]);
-    const tokens = [...nearly.filter((l) => l.step === "Done").map((l) => l.token), ...hoot.map((r) => r.token)];
+  const key = net().id;
+  warming[key] ??= (async () => {
+    const tokens = testnet
+      ? (await nearvana.recentLaunches(12).catch(() => [])).filter(nearvana.live).map((l) => l.token)
+      : await Promise.all([recentLaunches(8).catch(() => []), recentRooms(5).catch(() => [])]).then(([nearly, hoot]) => [
+          ...nearly.filter((l) => l.step === "Done").map((l) => l.token),
+          ...hoot.map((r) => r.token),
+        ]);
     await mapLimit(tokens, 4, (t) => earlyBuyers(t).catch(() => null));
   })().finally(() => {
-    warming = null;
+    delete warming[key];
   });
-  return warming;
+  return warming[key];
 }
 
 /** Other launches each account was an early buyer in, among those this app has looked at. */
@@ -152,6 +164,18 @@ export async function bundleCheck(info: TokenInfo, holders: Holder[]): Promise<C
       summary: `No pool buys in the token's first ${early.scanned_txs} transactions.`,
       findings: [{ level: "not_checked", text: `No buys from a Rhea pool in the token's first ${early.scanned_txs} transactions, so early buyers were not checked.` }],
       numbers: { scanned_txs: early.scanned_txs },
+      sources: [source],
+    };
+  }
+
+  if (!buyers.length) {
+    return {
+      id: "early_buyers",
+      title: "Early buyers",
+      level: "green",
+      summary: "Only the dev has bought from the pool so far.",
+      findings: [{ level: "green", text: `The only early buy came from the dev (${dev}); no other wallet has bought from the pool yet.` }],
+      numbers: { early_buyers: 0, scanned_txs: early.scanned_txs },
       sources: [source],
     };
   }

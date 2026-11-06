@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from "node:crypto";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getDb } from "../db";
 
 /**
@@ -32,6 +32,16 @@ export async function readSession(): Promise<Session | null> {
   return { id, account: row.account };
 }
 
+/**
+ * Whether the browser reached us over https. Behind the proxy that is `x-forwarded-proto`; a
+ * direct http visit (http://127.0.0.1:3000) gets a cookie without `Secure`, or the browser would
+ * drop it and every request would start a new guest with no chats.
+ */
+async function overHttps(): Promise<boolean> {
+  const proto = (await headers()).get("x-forwarded-proto");
+  return proto?.split(",")[0]?.trim() === "https";
+}
+
 /** The current session, starting a guest one (and setting the cookie) when there is none. */
 export async function ensureSession(): Promise<Session> {
   const s = await readSession();
@@ -43,7 +53,7 @@ export async function ensureSession(): Promise<Session> {
   (await cookies()).set(COOKIE, token, {
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: await overHttps(),
     path: "/",
     maxAge: MAX_AGE_S,
   });

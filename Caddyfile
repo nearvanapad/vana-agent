@@ -1,0 +1,9 @@
+# HTTPS in front of the app. DOMAIN is the public hostname: Caddy gets a certificate for it.
+# With DOMAIN=localhost it serves https://localhost with its own local certificate.
+{$DOMAIN:localhost} {
+	encode zstd gzip
+	# Chat answers stream: pass every chunk on as it comes.
+	reverse_proxy vana:3000 {
+		flush_interval -1
+	}
+}

@@ -2,18 +2,22 @@ import { explorer } from "../near/network";
 import { mapLimit, ref, type SourceRef } from "../sources/http";
 import { recentRooms } from "./launchpad/justhoot";
 import { NEARLY, recentLaunches } from "./launchpad/nearly";
+import * as nearvana from "./launchpad/nearvana";
+import { TESTNET } from "../near/network";
+import { onNetwork } from "../near/network-server";
 import { warmIndex } from "./bundle";
 import { riskReport } from "./report";
 import { rank } from "./rules";
 import type { Check, Level } from "./types";
 
 /**
- * Screens the newest nearly and justhoot launches with a quick risk report each (contract,
+ * Screens the newest nearly and justhoot launches (mainnet), or nearvana launches (testnet), with a quick risk report each (contract,
  * holders, liquidity, taxes, creator history) and keeps those that pass the filters.
  */
 
 export type ScreenInput = {
-  platform?: "nearly" | "justhoot" | "any";
+  /** "any" means the mainnet launchpads; nearvana is testnet and only screened when asked for. */
+  platform?: "nearly" | "justhoot" | "nearvana" | "any";
   /** Worst overall level allowed. */
   max_level?: Exclude<Level, "not_checked">;
   /** Checks that must be green. */
@@ -24,9 +28,20 @@ export type ScreenInput = {
   limit?: number;
 };
 
-type Candidate = { token: string; platform: "nearly" | "justhoot"; created_at: string };
+type Candidate = { token: string; platform: "nearly" | "justhoot" | "nearvana"; created_at: string };
 
 async function candidates(platform: ScreenInput["platform"], n: number): Promise<{ list: Candidate[]; sources: SourceRef[] }> {
+  if (platform === "nearvana") {
+    const launches = await onNetwork(TESTNET, () => nearvana.recentLaunches(n * 2)).catch(() => null);
+    if (!launches) throw new Error("The nearvana launchpad did not answer. Try again in a minute.");
+    return {
+      list: launches
+        .filter(nearvana.live)
+        .slice(0, n)
+        .map((l) => ({ token: l.token, platform: "nearvana" as const, created_at: new Date(l.created_at_ms).toISOString() })),
+      sources: [ref("NEAR RPC", `${TESTNET.explorer}/address/${nearvana.NEARVANA}`)],
+    };
+  }
   const [nearly, hoot] = await Promise.all([
     platform === "justhoot" ? null : recentLaunches(n * 2).catch(() => null),
     platform === "nearly" ? null : recentRooms(n).catch(() => null),
@@ -49,7 +64,7 @@ export async function findTokens(input: ScreenInput) {
   const clean = input.clean_checks ?? [];
   const { list, sources } = await candidates(input.platform ?? "any", scan);
   // Fill the sniper index in the background so the next full report can name snipers.
-  void warmIndex().catch(() => {});
+  if (input.platform !== "nearvana") void warmIndex().catch(() => {});
 
   const reports = await mapLimit(list, 4, (c) => riskReport(c.token, { quick: true }).catch(() => null));
   const checked = reports.filter((r) => r !== null).length;

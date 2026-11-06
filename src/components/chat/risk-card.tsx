@@ -24,7 +24,7 @@ const ABOUT: Record<CheckId, string> = {
   fresh_wallets: "Large holders whose wallet was created less than a week ago.",
   liquidity: "How deep the Rhea pools are in dollars, and whether whoever added the liquidity can pull it.",
   taxes: "Buy and sell tax set by the token, its pool or its launchpad.",
-  creator: "Other tokens the creator launched on nearly and justhoot, and how each ended.",
+  creator: "Other tokens the creator launched on nearly and justhoot (mainnet) or nearvana (testnet), and how each ended.",
 };
 
 type Row = [label: string, value: string];

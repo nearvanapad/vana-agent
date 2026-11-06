@@ -25,8 +25,10 @@ export type Check = {
   sources: SourceRef[];
 };
 
+export type LaunchpadName = "nearly" | "justhoot" | "nearvana";
+
 export type Launchpad = {
-  platform: "nearly" | "justhoot";
+  platform: LaunchpadName;
   creator: string;
   created_at: string | null;
   /** Buy/sell tax in percent, when the launchpad sets one. */

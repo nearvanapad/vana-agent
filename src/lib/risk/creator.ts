@@ -5,11 +5,12 @@ import { mapLimit, ref, type SourceRef } from "../sources/http";
 import { prices } from "../sources/rhea";
 import { hootUrl, roomsBy, tradesBy, type HootTrade, type Room } from "./launchpad/justhoot";
 import { launchesBy, NEARLY, poolNow, type NearlyLaunch } from "./launchpad/nearly";
+import * as nearvana from "./launchpad/nearvana";
 import { CREATOR_RED_BAD, DEAD_POOL_USD, units } from "./rules";
-import type { Check, Level, TokenInfo, Wallet } from "./types";
+import type { Check, LaunchpadName, Level, TokenInfo, Wallet } from "./types";
 
 /**
- * The creator's other launches on nearly and justhoot, and how each ended: still trading, dead
+ * The creator's other launches on nearly and justhoot (mainnet) or nearvana (testnet), and how each ended: still trading, dead
  * (sold back to the launch price or emptied), or sold off by the dev.
  */
 
@@ -20,7 +21,7 @@ export type Outcome = "alive" | "too_new" | "dead" | "dev_sold" | "failed";
 
 export type PastLaunch = {
   token: string;
-  platform: "nearly" | "justhoot";
+  platform: LaunchpadName;
   /** Creator-written. */
   symbol: string;
   created_at: string;
@@ -46,6 +47,24 @@ async function judgeNearly(l: NearlyLaunch, dev: string, px: Map<string, { price
   if (l.dev_buy_near > 0 && held === "0") {
     return { ...base, outcome: "dev_sold", detail: `The dev bought with ${l.dev_buy_near} NEAR at launch and holds none now.` };
   }
+  const q = px?.get(l.quote);
+  const usd = pool && q ? units(pool.quote_reserve, q.decimals) * q.price : null;
+  const old = Date.now() - l.created_at_ms > DAY;
+  if (old && pool && (pool.at_launch_price || (usd !== null && usd < DEAD_POOL_USD))) {
+    return {
+      ...base,
+      outcome: "dead",
+      detail: pool.at_launch_price ? "Price is back at the launch price: buyers sold out." : `Only $${usd!.toFixed(0)} of buy-side money left in the pool.`,
+    };
+  }
+  if (!old) return { ...base, outcome: "too_new", detail: "Launched less than a day ago." };
+  return { ...base, outcome: "alive", detail: usd !== null ? `$${Math.round(usd).toLocaleString("en-US")} of buy-side money in the pool.` : "Still has a live pool." };
+}
+
+async function judgeNearvana(l: nearvana.NearvanaLaunch, px: Map<string, { price: number; decimals: number }> | null): Promise<PastLaunch> {
+  const base = { token: l.token, platform: "nearvana" as const, symbol: l.symbol, created_at: new Date(l.created_at_ms).toISOString() };
+  if (l.failed) return { ...base, outcome: "failed", detail: "The launch never completed." };
+  const pool = await nearvana.poolNow(l).catch(() => null);
   const q = px?.get(l.quote);
   const usd = pool && q ? units(pool.quote_reserve, q.decimals) * q.price : null;
   const old = Date.now() - l.created_at_ms > DAY;
@@ -95,21 +114,13 @@ export async function creatorCheck(info: TokenInfo): Promise<Check> {
     };
   }
 
-  if (net().id !== "mainnet") {
-    return {
-      id: "creator",
-      title: "Creator history",
-      level: "not_checked",
-      summary: "Not checked: nearly and justhoot run on mainnet only.",
-      findings: [{ level: "not_checked", text: "The launchpads this check reads (nearly, justhoot) run on mainnet only, so there is no launch history on testnet." }],
-      numbers: { creator: dev },
-      sources: [],
-    };
-  }
-
-  const [nearly, rooms, px] = await Promise.all([
-    launchesBy(dev).catch(() => null),
-    roomsBy(dev).catch(() => null),
+  // Each network has its own launchpads: nearly and justhoot on mainnet, nearvana on testnet.
+  const testnet = net().id !== "mainnet";
+  const pads = testnet ? "nearvana" : "nearly or justhoot";
+  const [nearly, rooms, nv, px] = await Promise.all([
+    testnet ? null : launchesBy(dev).catch(() => null),
+    testnet ? null : roomsBy(dev).catch(() => null),
+    testnet ? nearvana.launchesBy(dev).catch(() => null) : null,
     prices()
       .then((p) => p.data)
       .catch(() => null),
@@ -117,16 +128,19 @@ export async function creatorCheck(info: TokenInfo): Promise<Check> {
   const sources: SourceRef[] = [];
   if (nearly) sources.push(ref("NEAR RPC", explorer(`/address/${NEARLY}`)));
   if (rooms) sources.push(ref("justhoot", `https://justhoot.fun`));
-  if (!nearly && !rooms) throw new Error("both launchpads unreachable");
+  if (nv) sources.push(ref("NEAR RPC", explorer(`/address/${nearvana.NEARVANA}`)));
+  if (!nearly && !rooms && !nv) throw new Error(testnet ? "launchpad unreachable" : "both launchpads unreachable");
 
   const otherNearly = (nearly ?? []).filter((l) => l.token !== info.token);
   const otherRooms = (rooms ?? []).filter((r) => r.token !== info.token);
-  const total = otherNearly.length + otherRooms.length;
+  const otherNv = (nv ?? []).filter((l) => l.token !== info.token);
+  const total = otherNearly.length + otherRooms.length + otherNv.length;
   const devTrades = otherRooms.length ? await tradesBy(dev).catch(() => null) : null;
 
   const recent = [
     ...otherNearly.map((l) => ({ at: l.created_at_ms, run: () => judgeNearly(l, dev, px) })),
     ...otherRooms.map((r) => ({ at: Date.parse(r.created_at), run: async () => judgeRoom(r, devTrades) })),
+    ...otherNv.map((l) => ({ at: l.created_at_ms, run: () => judgeNearvana(l, px) })),
   ]
     .sort((a, b) => b.at - a.at)
     .slice(0, MAX_PAST);
@@ -143,11 +157,11 @@ export async function creatorCheck(info: TokenInfo): Promise<Check> {
   else if (bad > 0) level = "yellow";
 
   const findings: Check["findings"] = [];
-  const where = info.launchpad ? "" : " (only nearly and justhoot launches are known)";
+  const where = info.launchpad ? "" : ` (only ${pads.replace(" or ", " and ")} launches are known)`;
   if (!total) {
     findings.push({
       level: "green",
-      text: info.launchpad ? `This is the first launch by ${dev} on nearly or justhoot.` : `${dev} has no launches on nearly or justhoot.`,
+      text: info.launchpad ? `This is the first launch by ${dev} on ${pads}.` : `${dev} has no launches on ${pads}.`,
     });
   } else {
     findings.push({
@@ -173,7 +187,7 @@ export async function creatorCheck(info: TokenInfo): Promise<Check> {
       ? `${total} other launch${total > 1 ? "es" : ""}; ${dead} dead, ${sold} sold by the dev, of the last ${past.length}.`
       : info.launchpad
         ? "First launch by this creator."
-        : "No nearly or justhoot launches by this dev.",
+        : `No ${pads} launches by this dev.`,
     findings,
     numbers: {
       creator: dev,
@@ -182,7 +196,7 @@ export async function creatorCheck(info: TokenInfo): Promise<Check> {
       dead,
       dev_sold: sold,
       alive: count("alive"),
-      past: past.map((p) => ({ token: p.token, platform: p.platform, created_at: p.created_at, outcome: p.outcome, detail: p.detail, url: p.platform === "justhoot" ? hootUrl(p.token) : explorer(`/token/${p.token}`) })),
+      past: past.map((p) => ({ token: p.token, platform: p.platform, created_at: p.created_at, outcome: p.outcome, detail: p.detail, url: p.platform === "justhoot" ? hootUrl(p.token) : p.platform === "nearvana" ? nearvana.coinUrl(p.token) : explorer(`/token/${p.token}`) })),
     },
     wallets,
     sources,

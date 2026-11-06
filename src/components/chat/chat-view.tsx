@@ -3,9 +3,11 @@
 import { useChat } from "@ai-sdk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { AlertTriangle, Loader2, RotateCcw, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Composer } from "./composer";
+import vana from "./vana.gif";
 import { Message } from "./message";
 
 /** Server errors arrive as the response body: show its `error` text when it is JSON. */
@@ -118,12 +120,12 @@ function Empty({ account, onPick, disabled }: { account: string | null; onPick: 
   const prompts = [
     "Is SWEAT safe?",
     `Is ${DEMO_TOKEN} safe?`,
-    "Find new launches with no red flags",
+    "Find clean new tokens on nearvana",
     account ? "What does my wallet hold?" : "Who is the dev behind xrpx.nearlytrade.near?",
   ];
   return (
     <div className="flex flex-col items-center gap-4 pt-[12vh] text-center">
-      <ShieldCheck className="text-accent" size={40} />
+      <Image src={vana} alt="Vana" width={96} height={96} unoptimized preload className="size-24" />
       <h2 className="font-display text-3xl">Is this NEAR token safe?</h2>
       <p className="max-w-md text-text-2">
         Ask about any NEP-141 token. VANA checks the contract, the holders, who bought first and whether they are the dev in disguise, the

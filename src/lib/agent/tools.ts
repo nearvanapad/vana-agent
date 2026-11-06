@@ -188,9 +188,9 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
 
     find_tokens: tool({
       description:
-        "Screen the newest nearly and justhoot launches (up to 20) with a quick risk check each and return those that pass: max overall level and checks that must be green. Quick means no early-buyer or fresh-wallet forensics; run risk_report on a pick for those. Takes up to ~40 s.",
+        "Screen the newest launches (up to 20): nearly and justhoot on mainnet, or nearvana on testnet when platform is nearvana, with a quick risk check each and return those that pass: max overall level and checks that must be green. Quick means no early-buyer or fresh-wallet forensics; run risk_report on a pick for those. Takes up to ~40 s.",
       inputSchema: z.object({
-        platform: z.enum(["nearly", "justhoot", "any"]).optional().describe("Default any."),
+        platform: z.enum(["nearly", "justhoot", "nearvana", "any"]).optional().describe("Default any (the mainnet launchpads). nearvana is a testnet launchpad: use it when the user names nearvana or testnet."),
         max_level: z.enum(["green", "yellow", "red"]).optional().describe("Worst overall level to keep. Default yellow."),
         clean_checks: z
           .array(z.enum(["contract", "holders", "liquidity", "taxes", "creator"]))

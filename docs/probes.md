@@ -150,3 +150,9 @@ Tokens and accounts ending in `.testnet` are read from testnet; everything else 
 - Three early buyers, all tied to the dev: one funded by the dev, one dev sub-account, and one funded by the first buyer that also got 40M VRUG from the dev.
 
 Expected report: red on contract, holders, early buyers, fresh wallets and liquidity. Creator history is not checked (the launchpads it reads are on mainnet).
+
+## nearvana (testnet launchpad)
+- Factory `nearvana2.nearvanapad.testnet`; tokens are `<ticker>.nearvana2.nearvanapad.testnet`. No mainnet deployment yet.
+- `get_launch({token})` and `get_launches({from, limit, filter: {creator?, quote?, listed?}})` return the launch record: `launch_id`, `creator`, `quote`, `meta`, `buy_tax_bps`, `sell_tax_bps`, `pool_id` (Rhea DCL `dclv2.ref-dev.testnet`), `start_point`, `token_is_x`, `lpt_id`, `step` (`completed` when live), `created_at` (ns).
+- `get_config` names the locker (`locker.nearvana2.nearvanapad.testnet`) that holds each launch position. On 6 Nov it had one full-access key, so the liquidity check flags it.
+- The coin's own `get_tax` returns buy/sell bps, the taxed pairs and the exempt accounts. Coin page: `https://testnet.nearvana.trade/coin/<token>`.
