@@ -61,7 +61,7 @@ export function Composer(props: {
           title="Think mode: slower, reasons more before answering"
           className={clsx(
             "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs",
-            props.think ? "border-accent bg-accent/15 text-accent" : "border-line text-text-2 hover:bg-surface-2",
+            props.think ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line text-text-2 hover:bg-surface-2",
           )}
         >
           <Brain size={13} /> Think
@@ -75,7 +75,7 @@ export function Composer(props: {
             type="submit"
             disabled={!text.trim() || props.disabled}
             aria-label="Send"
-            className="rounded-full bg-accent p-2 text-accent-ink hover:bg-accent-hi disabled:opacity-40"
+            className="rounded-full bg-accent p-2 text-accent-ink hover:bg-accent-hi disabled:opacity-40 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none"
           >
             <ArrowUp size={16} />
           </button>

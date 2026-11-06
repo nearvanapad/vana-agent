@@ -26,7 +26,7 @@ function Chip({ id, swap, label, children, strong }: { id: string; swap?: boolea
       type="button"
       onClick={open}
       aria-label={label}
-      className={`flex w-full items-center gap-3 rounded-card border bg-surface px-3 py-2.5 text-left hover:bg-surface-2/60 ${strong ? "border-accent/60" : "border-line"}`}
+      className={`flex w-full items-center gap-3 rounded-card border bg-surface px-3 py-2.5 text-left hover:bg-surface-2/60 ${strong ? "border-accent-deep/60" : "border-line"}`}
     >
       <span className="min-w-0 flex-1">{children}</span>
       <span className="flex shrink-0 items-center gap-0.5 text-xs text-text-2">
@@ -42,7 +42,7 @@ export function ReportChip({ id, out }: { id: string; out: PendingReport | Repor
     return (
       <Chip id={id} label={`Checking ${out.token}, open in the side pane`}>
         <span className="flex items-center gap-2 text-sm">
-          <Loader2 size={14} className="shrink-0 animate-spin text-accent" />
+          <Loader2 size={14} className="shrink-0 animate-spin text-accent-deep" />
           <span className="truncate font-mono">{out.token}</span>
         </span>
         <span className="block text-xs text-text-2">
@@ -70,7 +70,7 @@ export function ReportChip({ id, out }: { id: string; out: PendingReport | Repor
             pane.dispatch({ t: "focus", id: "compare", compare: null });
             pane.dispatch({ t: "open", tab: "check" });
           }}
-          className="flex items-center gap-1.5 text-xs text-text-2 hover:text-accent"
+          className="flex items-center gap-1.5 text-xs text-text-2 hover:text-accent-deep"
         >
           <Columns3 size={12} /> Compare side by side
         </button>
@@ -118,7 +118,7 @@ export function ProposalChip({ id, out }: { id: string; out: Proposal }) {
   return (
     <Chip id={id} swap strong label="Swap ready to approve in the side pane">
       <span className="flex flex-wrap items-center gap-2">
-        <Wallet size={14} className="shrink-0 text-accent" />
+        <Wallet size={14} className="shrink-0 text-accent-deep" />
         <span className="truncate font-mono text-sm">
           {out.from.amount} {out.from.symbol} → {out.to.amount} {out.to.symbol}
         </span>

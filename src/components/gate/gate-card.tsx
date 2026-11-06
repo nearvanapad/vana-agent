@@ -77,7 +77,7 @@ export function GateCard({ compact }: { compact?: boolean }) {
 
   return (
     <div className={clsx("mx-auto flex w-full max-w-md flex-col items-center gap-4 text-center", compact ? "px-4 py-8" : "pt-[10vh]")}>
-      <span className="grid size-12 place-items-center rounded-full bg-accent/15 text-accent">
+      <span className="grid size-12 place-items-center rounded-full bg-accent/15 text-accent-deep">
         <Lock size={22} />
       </span>
       <div className="space-y-1.5">
@@ -112,5 +112,5 @@ export function GateCard({ compact }: { compact?: boolean }) {
 }
 
 const PRIMARY =
-  "flex items-center justify-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-60";
+  "flex items-center justify-center gap-1.5 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-60 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none";
 const SECONDARY = "flex items-center justify-center gap-1.5 rounded-full border border-line px-4 py-2 text-sm text-text-2 hover:bg-surface-2 hover:text-text disabled:opacity-60";

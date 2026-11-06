@@ -1,7 +1,12 @@
 @import "tailwindcss";
 
-/* Brand palette. The only place colours are written as hex. Dark is the default theme. */
-:root {
+/*
+ * Brand palette, both themes: the only place colours are written as hex. The head script in layout.tsx
+ * sets data-theme before paint: the stored choice, else the system's. Dark is the fallback.
+ * --accent is a fill; green text and icons use --accent-deep, which stays readable on the light theme.
+ */
+:root,
+[data-theme="dark"] {
   --void: #0a1612;
   --ink: #141c1e;
   --teal: #1a3b3c;
@@ -19,34 +24,49 @@
   --accent: #69de8a;
   --accent-ink: #141c1e;
   --accent-deep: #69de8a;
+  /* The user's own chat bubble. */
+  --bubble: #1a3b3c;
+  /* Overlays behind drawers and dialogs. */
+  --scrim: rgb(10 22 18 / 0.7);
 
-  /* Risk levels. */
+  /* Risk levels, and the text drawn on a filled level chip. */
   --ok: #87f4a6;
   --warn: #f2c66d;
   --bad: #e3a48c;
   --none: #6f8a7d;
+  --on-level: #0a1612;
+
+  /* The sticker style: a thick edge and a hard offset shadow, for buttons and the active control. */
+  --edge: #b8dcc6;
+  --shadow: #387d57;
+  --sh: 3px;
+  --focus: #87f4a6;
 
   --radius-card: 16px;
   --radius-well: 12px;
   color-scheme: dark;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f6f9f4;
-    --surface: #ffffff;
-    --surface-2: #eef3ee;
-    --line: #dde5df;
-    --muted: #4a7a5e;
-    --text: #0a1612;
-    --text-2: #4f6a5b;
-    --accent-deep: #1f6b42;
-    --ok: #1f6b42;
-    --warn: #8a5a00;
-    --bad: #7a3b22;
-    --none: #5d6f66;
-    color-scheme: light;
-  }
+[data-theme="light"] {
+  --bg: #f6f9f4;
+  --surface: #ffffff;
+  --surface-2: #eef3ee;
+  --line: #dde5df;
+  --muted: #4a7a5e;
+  --text: #0a1612;
+  --text-2: #4f6a5b;
+  --accent-deep: #1f6b42;
+  --bubble: #dcf3e2;
+  --scrim: rgb(10 22 18 / 0.35);
+  --ok: #1f6b42;
+  --warn: #8a5a00;
+  --bad: #7a3b22;
+  --none: #5d6f66;
+  --on-level: #f6f9f4;
+  --edge: #141c1e;
+  --shadow: #141c1e;
+  --focus: #1f6b42;
+  color-scheme: light;
 }
 
 @theme inline {
@@ -70,6 +90,14 @@
   --color-warn: var(--warn);
   --color-bad: var(--bad);
   --color-none: var(--none);
+  --color-on-level: var(--on-level);
+  --color-bubble: var(--bubble);
+  --color-scrim: var(--scrim);
+  --color-edge: var(--edge);
+  --color-shadow: var(--shadow);
+
+  /* `shadow-sticker`: pressing a sticker button pushes it into its shadow. */
+  --shadow-sticker: var(--sh) var(--sh) 0 var(--shadow);
 
   --font-display: var(--font-bowlby), system-ui, sans-serif;
   --font-sans: var(--font-rubik), system-ui, sans-serif;
@@ -86,6 +114,6 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--highlight);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }

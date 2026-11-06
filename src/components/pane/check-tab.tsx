@@ -70,7 +70,7 @@ export function CheckTab() {
           autoCapitalize="none"
           className="min-w-0 flex-1 rounded-well border border-line bg-surface px-3 py-2 font-mono text-sm placeholder:font-sans placeholder:text-text-2/70 focus:border-muted focus:outline-none"
         />
-        <button type="submit" disabled={!q.trim()} className="flex items-center gap-1.5 rounded-well bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-40">
+        <button type="submit" disabled={!q.trim()} className="flex items-center gap-1.5 rounded-well bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-40 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none">
           <Search size={14} /> Check
         </button>
       </form>
@@ -147,7 +147,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       aria-pressed={active}
       className={clsx(
         "flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs",
-        active ? "border-accent bg-accent/15 text-accent" : "border-line text-text-2 hover:bg-surface-2 hover:text-text",
+        active ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line text-text-2 hover:bg-surface-2 hover:text-text",
       )}
     >
       {children}
@@ -238,7 +238,7 @@ function Progress({ item }: { item: ReportItem }) {
       <header className="border-b border-line px-4 py-3">
         <div className="truncate font-mono text-sm font-semibold">{item.token}</div>
         <p className="mt-1 flex items-center gap-2 text-xs text-text-2" role="status">
-          <Loader2 size={12} className="animate-spin text-accent" />
+          <Loader2 size={12} className="animate-spin text-accent-deep" />
           {item.done.length ? `${item.done.length} of ${CHECKS.length} checks in` : "Reading the contract…"}
         </p>
       </header>
@@ -266,7 +266,7 @@ function SearchBody({ item }: { item: SearchItem }) {
   if (!item.matches)
     return (
       <p className="flex items-center gap-2 text-sm text-text-2" role="status">
-        <Loader2 size={14} className="animate-spin text-accent" /> Searching tokens for “{item.query}”…
+        <Loader2 size={14} className="animate-spin text-accent-deep" /> Searching tokens for “{item.query}”…
       </p>
     );
   if (!item.matches.length) return <p className="text-sm text-text-2">No token matches “{item.query}”. Try its contract id.</p>;
@@ -288,7 +288,7 @@ function SearchBody({ item }: { item: SearchItem }) {
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5 text-sm font-semibold">
                   <span className="font-mono">{m.symbol || "?"}</span>
-                  {m.verified && <BadgeCheck size={13} className="text-accent" aria-label="verified" />}
+                  {m.verified && <BadgeCheck size={13} className="text-accent-deep" aria-label="verified" />}
                   {m.launchpad && <span className="rounded-full border border-line px-1.5 text-[0.65rem] font-normal text-text-2">{m.launchpad}</span>}
                   {m.network === "testnet" && <span className="rounded-full border border-line px-1.5 text-[0.65rem] font-normal text-text-2">testnet</span>}
                 </span>
@@ -315,7 +315,7 @@ function ScreenBody({ item }: { item: ScreenItem }) {
   if (!item.result)
     return (
       <p className="flex items-center gap-2 text-sm text-text-2" role="status">
-        <Loader2 size={14} className="animate-spin text-accent" /> Screening the newest {where} launches… (up to 40 s)
+        <Loader2 size={14} className="animate-spin text-accent-deep" /> Screening the newest {where} launches… (up to 40 s)
       </p>
     );
   const r = item.result;

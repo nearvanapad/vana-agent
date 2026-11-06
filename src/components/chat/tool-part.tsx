@@ -83,7 +83,7 @@ export function ToolPart({ part }: { part: ToolPartLike }) {
   if (part.state === "input-streaming" || part.state === "input-available") {
     return (
       <div className="flex items-center gap-2 text-sm text-text-2" role="status">
-        <Loader2 size={14} className="animate-spin text-accent" />
+        <Loader2 size={14} className="animate-spin text-accent-deep" />
         <span>{toolLabel(name, input)}…</span>
       </div>
     );
@@ -113,7 +113,7 @@ export function ToolPart({ part }: { part: ToolPartLike }) {
       {chip}
       <details className="group text-sm text-text-2">
         <summary className="flex cursor-pointer list-none items-center gap-2 hover:text-text">
-          <Check size={14} className="text-accent" />
+          <Check size={14} className="text-accent-deep" />
           {toolLabel(name, input, true)}
         </summary>
         <div className="mt-2 pl-6">

@@ -115,7 +115,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
             )}
             {waiting && (
               <div className="flex items-center gap-2 text-sm text-text-2" role="status">
-                <Loader2 size={14} className="animate-spin text-accent" /> {think ? "Thinking…" : "Working…"}
+                <Loader2 size={14} className="animate-spin text-accent-deep" /> {think ? "Thinking…" : "Working…"}
               </div>
             )}
             {stopped && !busy && !error && (

@@ -199,7 +199,7 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
           type="button"
           disabled={approve.isPending || (red && !ack)}
           onClick={() => approve.mutate()}
-          className="flex w-full items-center justify-center gap-2 rounded-well bg-accent px-4 py-2.5 font-medium text-bg hover:brightness-110 disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-well bg-accent px-4 py-2.5 font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-50 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none"
         >
           {approve.isPending ? <Loader2 size={16} className="animate-spin" /> : <Wallet size={16} />}
           {approve.isPending ? "Getting the final quote…" : "Approve in wallet"}
@@ -249,7 +249,7 @@ function Note({ children }: { children: ReactNode }) {
 
 function TxLink({ href, children }: { href: string; children: ReactNode }) {
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-xs text-text-2 hover:text-accent">
+    <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1 text-xs text-text-2 hover:text-accent-deep">
       {children} <ExternalLink size={11} />
     </a>
   );
@@ -273,7 +273,7 @@ function Progress({ swap, proposal }: { swap: SwapView; proposal: Proposal }) {
     return (
       <div>
         <p className="flex items-center gap-2 text-sm" role="status">
-          <Loader2 size={15} className="animate-spin text-accent" /> {text}
+          <Loader2 size={15} className="animate-spin text-accent-deep" /> {text}
         </p>
         {links}
       </div>

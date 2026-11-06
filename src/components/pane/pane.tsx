@@ -187,7 +187,7 @@ export function PaneOverlay() {
     <Dialog.Root modal={false} open={mode === "drawer"} onOpenChange={(o) => pane.dispatch(o ? { t: "open" } : { t: "close" })}>
       <Dialog.Portal>
         {/* Between the header and the tab bar, so both stay in view. */}
-        <div className={clsx("fixed inset-x-0 top-15 z-40 bg-void/70", BOTTOM)} aria-hidden />
+        <div className={clsx("fixed inset-x-0 top-15 z-40 bg-scrim", BOTTOM)} aria-hidden />
         <Dialog.Content
           onInteractOutside={(e) => {
             // The tab bar switches the drawer's tab itself.
@@ -220,7 +220,7 @@ export function PaneTabBar() {
             type="button"
             onClick={() => pane.dispatch(id === "chat" ? { t: "close" } : { t: "open", tab: id })}
             aria-current={on ? "page" : undefined}
-            className={clsx("flex h-14 flex-col items-center justify-center gap-0.5 text-[0.7rem]", on ? "text-accent" : "text-text-2")}
+            className={clsx("flex h-14 flex-col items-center justify-center gap-0.5 text-[0.7rem]", on ? "text-accent-deep" : "text-text-2")}
           >
             <Icon size={20} strokeWidth={on ? 2.25 : 1.75} />
             {label}
@@ -246,7 +246,7 @@ export function PaneToggles() {
             aria-pressed={on}
             className={clsx(
               "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs",
-              on ? "border-accent bg-accent/15 text-accent" : "border-line bg-bg text-text-2 hover:bg-surface-2 hover:text-text",
+              on ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line bg-bg text-text-2 hover:bg-surface-2 hover:text-text",
             )}
           >
             <Icon size={13} /> {label}

@@ -27,7 +27,7 @@ export function ConnectButton() {
               type="button"
               onClick={() => session.signIn.mutate()}
               disabled={session.signIn.isPending}
-              className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-60"
+              className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-60 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none"
               title="Sign a message (no transaction) to keep your chats under this account"
             >
               <PenLine size={14} />
@@ -38,7 +38,7 @@ export function ConnectButton() {
             className="flex max-w-44 items-center gap-1.5 truncate rounded-full border border-line bg-surface px-3 py-1.5 font-mono text-sm"
             title={signedIn ? `Signed in as ${account}` : account}
           >
-            {signedIn && <BadgeCheck size={14} className="shrink-0 text-accent" />}
+            {signedIn && <BadgeCheck size={14} className="shrink-0 text-accent-deep" />}
             <span className="truncate">{account}</span>
           </span>
           <button
@@ -61,7 +61,7 @@ export function ConnectButton() {
         type="button"
         onClick={() => void connect()}
         disabled={!ready || connecting}
-        className="flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-60"
+        className="flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-60 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none"
       >
         <Wallet size={16} />
         {connecting ? "Connecting…" : "Connect wallet"}

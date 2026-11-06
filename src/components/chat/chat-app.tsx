@@ -6,6 +6,7 @@ import type { UIMessage } from "ai";
 import { Loader2, Menu, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "@/components/session/use-session";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { ConnectButton } from "@/components/wallet/connect-button";
 import Image from "next/image";
 import { PaneProvider } from "@/components/pane/pane-context";
@@ -133,7 +134,7 @@ export function ChatApp() {
     <PaneProvider key={active ?? "none"} conversationId={active}>
       <div className="flex h-dvh overflow-hidden">
         <aside className="hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-surface/40 p-3 md:flex">
-          <h1 className="mb-4 flex items-center gap-2 px-1 pt-1 font-display text-2xl tracking-wide text-accent">
+          <h1 className="mb-4 flex items-center gap-2 px-1 pt-1 font-display text-2xl tracking-wide text-accent-deep">
             <Logo size={36} />
             VANA
           </h1>
@@ -142,10 +143,10 @@ export function ChatApp() {
 
         <Dialog.Root open={menu} onOpenChange={setMenu}>
           <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 z-40 bg-void/70 md:hidden" />
+            <Dialog.Overlay className="fixed inset-0 z-40 bg-scrim md:hidden" />
             <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-line bg-bg p-3 md:hidden">
               <div className="mb-4 flex items-center justify-between">
-                <Dialog.Title className="flex items-center gap-2 px-1 font-display text-2xl tracking-wide text-accent">
+                <Dialog.Title className="flex items-center gap-2 px-1 font-display text-2xl tracking-wide text-accent-deep">
                   <Logo size={36} />
                   VANA
                 </Dialog.Title>
@@ -166,12 +167,15 @@ export function ChatApp() {
               <button type="button" onClick={() => setMenu(true)} className="rounded p-1.5 text-text-2 hover:bg-surface-2 md:hidden" aria-label="Open menu">
                 <Menu size={20} />
               </button>
-              <span className="flex items-center gap-1.5 font-display text-xl tracking-wide text-accent md:hidden">
+              <span className="flex items-center gap-1.5 font-display text-xl tracking-wide text-accent-deep md:hidden">
                 <Logo size={28} />
                 VANA
               </span>
             </div>
-            <ConnectButton />
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <ConnectButton />
+            </div>
           </header>
 
           {active === null || (!isLocal && thread.isPending) ? (

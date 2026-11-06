@@ -157,7 +157,7 @@ export function TokenPicker({ value, onChange, label, typing }: { value: string;
                   aria-pressed={filter === f.id}
                   className={clsx(
                     "rounded-full border px-2.5 py-0.5 text-xs",
-                    filter === f.id ? "border-accent bg-accent/15 text-accent" : "border-line text-text-2 hover:bg-surface-2",
+                    filter === f.id ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line text-text-2 hover:bg-surface-2",
                   )}
                 >
                   {f.label}
@@ -210,7 +210,7 @@ export function TokenPicker({ value, onChange, label, typing }: { value: string;
                   <span className="flex items-center gap-1.5 text-sm">
                     <span className="truncate font-semibold">{t.symbol}</span>
                     {t.verified && <BadgeCheck size={13} className="shrink-0 text-ok" aria-label="Verified on Rhea" />}
-                    {t.launchpad && <span className="shrink-0 rounded-full bg-accent/15 px-1.5 text-[0.65rem] text-accent">{t.launchpad}</span>}
+                    {t.launchpad && <span className="shrink-0 rounded-full bg-accent/15 px-1.5 text-[0.65rem] text-accent-deep">{t.launchpad}</span>}
                   </span>
                   <span className="flex items-center gap-2 text-xs text-text-2">
                     <span className="truncate font-mono">{short(t.token)}</span>
@@ -221,7 +221,7 @@ export function TokenPicker({ value, onChange, label, typing }: { value: string;
             ))}
             {loading && (
               <li className="flex items-center gap-2 px-4 py-3 text-sm text-text-2">
-                <Loader2 size={14} className="animate-spin text-accent" /> Loading the token list…
+                <Loader2 size={14} className="animate-spin text-accent-deep" /> Loading the token list…
               </li>
             )}
             {error && !tokens.length && <li className="px-4 py-3 text-sm text-bad">The token list didn&apos;t load. Paste a contract id instead.</li>}
@@ -230,7 +230,7 @@ export function TokenPicker({ value, onChange, label, typing }: { value: string;
                 {hidden ? (
                   <>
                     No {FILTERS.find((f) => f.id === filter)?.label} token matches.{" "}
-                    <button type="button" onClick={() => setFilter("all")} className="text-accent hover:underline">
+                    <button type="button" onClick={() => setFilter("all")} className="text-accent-deep hover:underline">
                       Show all {hidden}
                     </button>
                   </>

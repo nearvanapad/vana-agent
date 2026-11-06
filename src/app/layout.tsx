@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { bowlby, jetbrains, rubik } from "./fonts";
 import "./globals.css";
+import { THEME_SCRIPT } from "@/lib/theme";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
@@ -14,7 +15,11 @@ export const viewport: Viewport = { viewportFit: "cover" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className={`${bowlby.variable} ${rubik.variable} ${jetbrains.variable}`}>
+    // The head script sets data-theme before paint, so the server markup differs from the DOM.
+    <html lang="en" className={`${bowlby.variable} ${rubik.variable} ${jetbrains.variable}`} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-dvh antialiased">
         <Providers>{children}</Providers>
       </body>

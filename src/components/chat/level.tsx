@@ -10,9 +10,9 @@ export const LEVEL: Record<Level, { word: string; icon: string; overall: string 
 };
 
 const MARK: Record<Level, string> = {
-  red: "bg-bad text-void border-bad",
+  red: "bg-bad text-on-level border-bad",
   yellow: "border-warn text-warn",
-  green: "bg-ok/90 text-void border-ok",
+  green: "bg-ok/90 text-on-level border-ok",
   not_checked: "border-dashed border-none text-none",
 };
 

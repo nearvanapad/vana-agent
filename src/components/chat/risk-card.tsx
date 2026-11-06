@@ -110,7 +110,7 @@ function Wallets({ wallets, net }: { wallets: NonNullable<ReportView["checks"][n
                 href={`${net}/address/${w.account}`}
                 target="_blank"
                 rel="noopener noreferrer nofollow"
-                className="min-w-0 flex-1 truncate font-mono hover:text-accent"
+                className="min-w-0 flex-1 truncate font-mono hover:text-accent-deep"
                 title={w.account}
               >
                 {w.account}
@@ -122,7 +122,7 @@ function Wallets({ wallets, net }: { wallets: NonNullable<ReportView["checks"][n
         ))}
       </ul>
       {wallets.length > SHOWN && (
-        <button type="button" onClick={() => setAll(!all)} className="mt-1 text-xs text-accent hover:underline">
+        <button type="button" onClick={() => setAll(!all)} className="mt-1 text-xs text-accent-deep hover:underline">
           {all ? "Show fewer" : `Show all ${wallets.length}`}
         </button>
       )}
@@ -143,7 +143,7 @@ export function RiskCard({ report }: { report: ReportView }) {
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-mono text-base font-semibold">{report.symbol || "?"}</span>
               {report.verified && (
-                <span className="inline-flex items-center gap-1 text-xs text-accent" title="Rhea lists this token as verified">
+                <span className="inline-flex items-center gap-1 text-xs text-accent-deep" title="Rhea lists this token as verified">
                   <BadgeCheck size={13} /> verified
                 </span>
               )}
@@ -157,7 +157,7 @@ export function RiskCard({ report }: { report: ReportView }) {
               href={`${net}/token/${report.token}`}
               target="_blank"
               rel="noopener noreferrer nofollow"
-              className="block truncate font-mono text-xs text-text-2 hover:text-accent"
+              className="block truncate font-mono text-xs text-text-2 hover:text-accent-deep"
             >
               {report.token}
             </a>
@@ -241,7 +241,7 @@ export function RiskCard({ report }: { report: ReportView }) {
             href={report.launchpad.url}
             target="_blank"
             rel="noopener noreferrer nofollow"
-            className="inline-flex items-center gap-1 hover:text-accent"
+            className="inline-flex items-center gap-1 hover:text-accent-deep"
             title={report.launchpad.state ?? undefined}
           >
             <Rocket size={12} /> {report.launchpad.platform}

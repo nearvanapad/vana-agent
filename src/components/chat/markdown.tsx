@@ -9,7 +9,7 @@ export function Md({ text }: { text: string }) {
         remarkPlugins={[remarkGfm]}
         components={{
           a: ({ href, children }) => (
-            <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="text-accent underline underline-offset-2 hover:text-accent-hi">
+            <a href={href} target="_blank" rel="noopener noreferrer nofollow" className="text-accent-deep underline underline-offset-2 hover:text-text">
               {children}
             </a>
           ),

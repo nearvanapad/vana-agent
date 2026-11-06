@@ -33,7 +33,7 @@ export function Compare({ tokens }: { tokens: string[] | null }) {
               <th className="sticky left-0 bg-surface px-3 py-2 font-normal text-text-2">Check</th>
               {list.map((it) => (
                 <th key={it.token} className="px-3 py-2 align-bottom">
-                  <button type="button" onClick={() => pane.dispatch({ t: "focus", id: it.id })} className="text-left hover:text-accent" title={it.token}>
+                  <button type="button" onClick={() => pane.dispatch({ t: "focus", id: it.id })} className="text-left hover:text-accent-deep" title={it.token}>
                     <span className="block font-mono text-sm font-semibold">{it.report!.symbol || "?"}</span>
                     <span className="block max-w-[7rem] truncate font-mono font-normal text-text-2">{it.token}</span>
                   </button>

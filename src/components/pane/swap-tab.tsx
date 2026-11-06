@@ -99,7 +99,7 @@ export function SwapTab() {
                 type="button"
                 onClick={() => set({ slippage: p })}
                 aria-pressed={form.slippage === p}
-                className={clsx("rounded-full border px-2.5 py-0.5 text-xs", form.slippage === p ? "border-accent bg-accent/15 text-accent" : "border-line text-text-2 hover:bg-surface-2")}
+                className={clsx("rounded-full border px-2.5 py-0.5 text-xs", form.slippage === p ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line text-text-2 hover:bg-surface-2")}
               >
                 {p}%
               </button>
@@ -121,7 +121,7 @@ export function SwapTab() {
             disabled={!ready || Boolean(off) || !signedIn}
             onClick={() => pane.propose(input)}
             title={signedIn ? "Checks the token bought, then shows the approval card" : "Sign in with your wallet to swap"}
-            className="flex items-center justify-center gap-1.5 rounded-well bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-40"
+            className="flex items-center justify-center gap-1.5 rounded-well bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-40 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none"
           >
             <Wallet size={14} /> Review swap
           </button>
@@ -173,7 +173,7 @@ function Result({ item }: { item: QuoteItem | ProposalItem }) {
   if (item.kind === "proposal" && item.proposal) return <SwapCard proposal={item.proposal} />;
   return (
     <p className="flex items-center gap-2 text-sm text-text-2" role="status">
-      <Loader2 size={14} className="animate-spin text-accent" />
+      <Loader2 size={14} className="animate-spin text-accent-deep" />
       {item.kind === "quote" ? "Pricing the swap…" : "Checking the token and preparing the approval card…"}
     </p>
   );

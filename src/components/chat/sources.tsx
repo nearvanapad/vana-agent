@@ -16,7 +16,7 @@ export function Sources({ sources }: { sources: SourceRef[] }) {
           href={s.url}
           target="_blank"
           rel="noopener noreferrer nofollow"
-          className="inline-flex items-center gap-1 hover:text-accent"
+          className="inline-flex items-center gap-1 hover:text-accent-deep"
           title={`${s.url}\nread ${new Date(s.as_of).toLocaleString()}`}
         >
           {s.source} <span className="font-mono text-none">{time(s.as_of)}</span>
