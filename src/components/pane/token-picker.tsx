@@ -5,6 +5,7 @@ import { clsx } from "clsx";
 import { BadgeCheck, ChevronDown, Loader2, Search, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
 import { WALLET } from "@/lib/near/network";
+import { useUnlocked } from "../gate/gate-card";
 import { usePane } from "./pane-context";
 import { useSwapTokens, type SwapToken } from "./use-swap-tokens";
 
@@ -46,6 +47,7 @@ function Avatar({ icon, symbol, size = 28 }: { icon: string | null; symbol: stri
  */
 export function TokenPicker({ value, onChange, label, typing }: { value: string; onChange: (v: string) => void; label: string; typing?: boolean }) {
   const pane = usePane();
+  const unlocked = useUnlocked();
   const { tokens, byId, loading, error } = useSwapTokens();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -193,7 +195,8 @@ export function TokenPicker({ value, onChange, label, typing }: { value: string;
                     title={`Check ${t.symbol} before swapping`}
                     onClick={() => {
                       setOpen(false);
-                      pane.lookup(t.token);
+                      // Locked, the Check tab shows how to unlock it instead.
+                      if (unlocked) pane.lookup(t.token);
                       pane.dispatch({ t: "open", tab: "check" });
                     }}
                     className="flex items-center gap-1 rounded-full px-2 py-1 text-xs text-text-2 hover:bg-surface-2 hover:text-text"

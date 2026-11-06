@@ -7,6 +7,7 @@ import { clsx } from "clsx";
 import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { GateCard, useUnlocked } from "@/components/gate/gate-card";
 import { useChatSync } from "@/components/pane/chat-sync";
 import { PaneInline, PaneToggles, usePaneMode } from "@/components/pane/pane";
 import { usePane } from "@/components/pane/pane-context";
@@ -97,13 +98,17 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
   }, [messages, waiting]);
   // With the pane inside the chat, the chat box runs under both.
   const inline = usePaneMode() === "inline";
+  // Until the wallet holds enough NVANA, the chat shows the way in instead.
+  const locked = useUnlocked() === false;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 gap-4 px-4">
         <div ref={scroller} onScroll={onScroll} className="min-w-0 flex-1 overflow-y-auto">
           <div className="mx-auto max-w-3xl space-y-6 py-6">
-            {messages.length === 0 ? (
+            {locked ? (
+              <GateCard />
+            ) : messages.length === 0 ? (
               <Empty account={account} onPick={send} disabled={!ready} />
             ) : (
               messages.map((m) => <Message key={m.id} message={m} />)
@@ -135,7 +140,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
       <div className="shrink-0 px-4 pb-3 pt-2 md:pb-4">
         <div className={clsx("mx-auto", !inline && "max-w-3xl")}>
           <PaneToggles />
-          <Composer busy={busy} disabled={!ready} think={think} onThink={setThink} onSend={send}
+          <Composer busy={busy} disabled={!ready || locked} think={think} onThink={setThink} onSend={send}
             onStop={() => {
               setStopped(true);
               void stop();

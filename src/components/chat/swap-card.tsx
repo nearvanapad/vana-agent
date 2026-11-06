@@ -140,6 +140,11 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
   });
   const swap = live.data;
   const status = swap?.status ?? "proposed";
+  // A finished swap may have bought the NVANA that unlocks the chat: read the balance again.
+  const { recheck } = session;
+  useEffect(() => {
+    if (status === "success" && mine) void recheck();
+  }, [status, mine, recheck]);
 
   const approve = useMutation({
     mutationFn: async () => {

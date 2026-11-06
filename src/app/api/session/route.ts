@@ -1,11 +1,13 @@
 import { z } from "zod";
 import { challenge, SignInError, verifySignIn } from "@/lib/auth/nep413";
 import { ensureSession, readSession, signIn, signOut } from "@/lib/auth/session";
+import { access } from "@/lib/gate/access";
 
-/** Who the browser is: a guest, or a wallet account signed in with NEP-413. */
-export async function GET() {
+/** Who the browser is (a guest, or a wallet account signed in with NEP-413) and whether it may chat. `?fresh=1` rereads the balance. */
+export async function GET(req: Request) {
   const s = await ensureSession();
-  return Response.json({ account: s.account });
+  const fresh = new URL(req.url).searchParams.has("fresh");
+  return Response.json({ account: s.account, access: await access(s.account, { fresh }) });
 }
 
 const Body = z.discriminatedUnion("step", [
@@ -29,7 +31,8 @@ export async function POST(req: Request) {
   if (body.data.step === "challenge") return Response.json(challenge(recipientOf(req)));
   try {
     const account = await verifySignIn(body.data, recipientOf(req));
-    return Response.json({ account: signIn(s, account).account });
+    const signed = signIn(s, account).account;
+    return Response.json({ account: signed, access: await access(signed, { fresh: true }) });
   } catch (e) {
     const msg = e instanceof SignInError ? e.message : "Sign-in failed. Try again.";
     return Response.json({ error: msg }, { status: 401 });
@@ -39,5 +42,5 @@ export async function POST(req: Request) {
 export async function DELETE() {
   const s = await readSession();
   if (s) signOut(s);
-  return Response.json({ account: null });
+  return Response.json({ account: null, access: await access(null) });
 }

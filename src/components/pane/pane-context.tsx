@@ -5,6 +5,8 @@ import type { CheckDone, PendingReport } from "@/lib/agent/report-stream";
 import type { TokenMatch } from "@/lib/agent/search";
 import type { ReportView } from "@/lib/agent/tools";
 import type { PaneState } from "@/lib/agent/prompt";
+import { GATE_TOKEN } from "@/lib/gate/config";
+import { networkOf, WALLET } from "@/lib/near/network";
 import type { findTokens } from "@/lib/risk/screen";
 import type { Proposal, SwapQuote } from "@/lib/swap/service";
 
@@ -55,7 +57,8 @@ type Action =
   | { t: "fillCheck"; text: string }
   | { t: "fillSwap"; input: SwapIn };
 
-const EMPTY_FORM: SwapForm = { from: "NEAR", to: "", amount: "", slippage: 1 };
+// NVANA by default: the token that unlocks the chat and the checks.
+const EMPTY_FORM: SwapForm = { from: "NEAR", to: networkOf(GATE_TOKEN).id === WALLET.id ? GATE_TOKEN : "", amount: "", slippage: 1 };
 
 function reducer(s: State, a: Action): State {
   switch (a.t) {

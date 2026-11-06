@@ -16,6 +16,7 @@ import { buildTools } from "@/lib/agent/tools";
 import { ownerOf, readSession } from "@/lib/auth/session";
 import { CONVERSATION_ID, ensureConversation, loadMessages, NotYours, saveMessages, titleFrom } from "@/lib/chat/store";
 import { allow } from "@/lib/chat/rate-limit";
+import { access, denied } from "@/lib/gate/access";
 
 const Id = z.string().max(120).regex(/^[A-Za-z0-9._:-]+$/);
 const Body = z.object({
@@ -44,6 +45,8 @@ export async function POST(req: Request) {
   if (!llmConfigured()) return Response.json({ error: "The AI model is not configured on this server (LLM_API_KEY)." }, { status: 503 });
   const s = await readSession();
   if (!s) return Response.json({ error: "No session. Reload the page." }, { status: 401 });
+  const a = await access(s.account);
+  if (!a.ok) return denied(a);
   if (!allow(s.id)) return Response.json({ error: "Too many messages. Wait a minute and try again." }, { status: 429 });
 
   const body = Body.safeParse(await req.json().catch(() => null));

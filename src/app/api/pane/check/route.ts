@@ -3,6 +3,7 @@ import { reportProgress } from "@/lib/agent/report-stream";
 import { reportView } from "@/lib/agent/tools";
 import { readSession } from "@/lib/auth/session";
 import { allow } from "@/lib/chat/rate-limit";
+import { access, denied } from "@/lib/gate/access";
 import { normalizeToken } from "@/lib/risk/report";
 
 /**
@@ -15,6 +16,8 @@ const Body = z.object({ token: z.string().min(2).max(80), fresh: z.boolean().opt
 export async function POST(req: Request) {
   const s = await readSession();
   if (!s) return Response.json({ error: "No session. Reload the page." }, { status: 401 });
+  const a = await access(s.account);
+  if (!a.ok) return denied(a);
   if (!allow(s.id)) return Response.json({ error: "Too many checks. Wait a minute and try again." }, { status: 429 });
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) return Response.json({ error: "Bad request." }, { status: 400 });

@@ -1,9 +1,11 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useState } from "react";
+import type { Access } from "@/lib/gate/config";
 import { signMessage } from "@/lib/near/wallet";
 
-type SessionInfo = { account: string | null };
+type SessionInfo = { account: string | null; access: Access };
 
 async function json<T>(res: Response): Promise<T> {
   const body = (await res.json().catch(() => ({}))) as T & { error?: string };
@@ -45,5 +47,16 @@ export function useSession() {
     onSuccess: done,
   });
 
-  return { ready: query.isSuccess, account: query.data?.account ?? null, error: query.error, signIn, signOut };
+  // Reads the NVANA balance again, past the server's short cache (after buying some, say).
+  const [rechecking, setRechecking] = useState(false);
+  const recheck = useCallback(async () => {
+    setRechecking(true);
+    try {
+      qc.setQueryData(["session"], await fetch("/api/session?fresh=1").then((r) => json<SessionInfo>(r)));
+    } finally {
+      setRechecking(false);
+    }
+  }, [qc]);
+
+  return { ready: query.isSuccess, account: query.data?.account ?? null, access: query.data?.access ?? null, error: query.error, signIn, signOut, recheck, rechecking };
 }

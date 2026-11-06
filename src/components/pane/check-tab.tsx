@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { networkOf, WALLET } from "@/lib/near/network";
 import { Dot, LevelPill, Mark } from "../chat/level";
 import { RiskCard, shortAccount } from "../chat/risk-card";
+import { GateCard, useUnlocked } from "../gate/gate-card";
 import { Compare } from "./compare";
 import { usePane, useWake, type PaneItem, type ReportItem, type ScreenItem, type SearchItem } from "./pane-context";
 
@@ -46,6 +47,9 @@ export function CheckTab() {
   useWake(focused);
   const chips = strip(pane.items);
   const doneReports = pane.reports.filter((r) => r.status === "done");
+  const unlocked = useUnlocked();
+
+  if (unlocked === false) return <GateCard compact />;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
