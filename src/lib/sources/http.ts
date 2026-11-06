@@ -67,6 +67,25 @@ export async function getJson<T>(
   throw last instanceof Error ? last : new Error(`fetch failed: ${url}`);
 }
 
+/**
+ * POST JSON once (no retry: a quote or a submit must not be sent twice). A non-2xx answer throws
+ * an HttpError carrying the body's `message` when it has one.
+ */
+export async function postJson<T>(url: string, body: unknown, opts: { headers?: Record<string, string>; timeoutMs?: number } = {}): Promise<T> {
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { accept: "application/json", "content-type": "application/json", ...opts.headers },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(opts.timeoutMs ?? 20_000),
+  });
+  const json = (await res.json().catch(() => null)) as (T & { message?: unknown }) | null;
+  if (!res.ok || json === null) {
+    const msg = json && typeof json.message === "string" ? json.message : `${res.status} from ${new URL(url).host}`;
+    throw new HttpError(msg, res.status, url);
+  }
+  return json;
+}
+
 /** Runs `fn` over `items` with at most `limit` in flight. */
 export async function mapLimit<T, R>(items: T[], limit: number, fn: (item: T, i: number) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length);

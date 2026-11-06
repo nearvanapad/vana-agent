@@ -2,15 +2,18 @@
 
 import { AlertTriangle, Check, Loader2 } from "lucide-react";
 import type { ReportView } from "@/lib/agent/tools";
+import type { Proposal, SwapQuote } from "@/lib/swap/service";
 import type { SourceRef } from "@/lib/sources/http";
 import { RiskCard } from "./risk-card";
 import { Sources } from "./sources";
+import { QuoteCard, SwapCard } from "./swap-card";
 
 type Input = Record<string, unknown> | undefined;
 
 /** What the agent is doing, in words, for the status line. */
 export function toolLabel(name: string, input: Input, done = false): string {
   const t = String(input?.token ?? input?.account ?? input?.query ?? "").slice(0, 64);
+  const pair = input?.from ? `${String(input.amount ?? "")} ${short(input.from)} → ${short(input.to)}` : "the swap";
   const v = (doing: string, did: string) => (done ? did : doing);
   switch (name) {
     case "risk_report":
@@ -27,11 +30,21 @@ export function toolLabel(name: string, input: Input, done = false): string {
       return v(`Profiling ${t}`, `Profiled ${t}`);
     case "search_token":
       return v(`Searching tokens for “${t}”`, `Searched tokens for “${t}”`);
+    case "quote_swap":
+      return v(`Pricing ${pair}`, `Priced ${pair}`);
+    case "propose_swap":
+      return v(`Preparing ${pair} for your approval`, `Prepared ${pair}`);
     case "list_swap_assets":
       return v("Listing NEAR Intents assets", "Listed NEAR Intents assets");
     default:
       return v(`Running ${name}`, `Ran ${name}`);
   }
+}
+
+/** Asset ids can be long: keep the readable end. */
+function short(v: unknown): string {
+  const s = String(v ?? "").replace(/^nep141:/, "");
+  return s.length > 28 ? `${s.slice(0, 12)}…${s.slice(-10)}` : s;
 }
 
 export type ToolPartLike = {
@@ -73,6 +86,8 @@ export function ToolPart({ part }: { part: ToolPartLike }) {
   if (part.state !== "output-available") return null;
 
   if (name === "risk_report") return <RiskCard report={part.output as ReportView} />;
+  if (name === "quote_swap") return <QuoteCard quote={part.output as SwapQuote} />;
+  if (name === "propose_swap") return <SwapCard proposal={part.output as Proposal} />;
 
   return (
     <details className="group text-sm text-text-2">

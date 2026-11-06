@@ -6,6 +6,7 @@ import type { Check, RiskReport } from "../risk/types";
 import { ref, refOf } from "../sources/http";
 import { swapAssets } from "../sources/oneclick";
 import { prices } from "../sources/rhea";
+import { proposeSwap, quoteSwap, type Proposal, type SwapQuote } from "../swap/service";
 import { stranger, type Guard } from "./guard";
 import { walletProfile } from "./profile";
 import { searchToken } from "./search";
@@ -55,8 +56,40 @@ function readStranger(guard: Guard, r: RiskReport) {
   if (!r.verified && (r.name || r.symbol)) guard.taint(`the creator-written name of ${r.token}`);
 }
 
-export function buildTools(guard: Guard) {
+const swapArgs = z.object({
+  from: z.string().min(2).max(120).describe('What the user pays with, on NEAR: "NEAR", or a token contract id (e.g. usdt.tether-token.near).'),
+  to: z
+    .string()
+    .min(2)
+    .max(120)
+    .describe('What the user receives: "NEAR", a NEAR token contract id, or a NEAR Intents asset_id from list_swap_assets for assets on other chains.'),
+  amount: z.string().min(1).max(40).describe('Amount of `from` in normal units, e.g. "10" or "0.5". Never raw units.'),
+  slippage_pct: z.number().min(0.1).max(5).optional().describe("Max price slippage in percent. Default 1."),
+  recipient: z.string().max(128).optional().describe("Only when `to` is on another chain: the user's address there. Never make one up."),
+});
+
+export type ToolContext = { account: string | null; conversationId: string | null };
+
+export function buildTools(guard: Guard, ctx: ToolContext) {
   return {
+    quote_swap: tool({
+      description:
+        "Price a swap without committing to anything: route (NEAR Intents or a Rhea pool), amount out, minimum after slippage, fees. Read-only; works for guests.",
+      inputSchema: swapArgs,
+      execute: async (args): Promise<SwapQuote> => quoteSwap(args, ctx.account),
+    }),
+
+    propose_swap: tool({
+      description:
+        "Show the user a swap approval card for their wallet. Runs the risk check on the token bought and re-checks the balance. The user approves and signs in their wallet; you never sign. Only after the user clearly asked to swap these exact assets and amount.",
+      inputSchema: swapArgs,
+      execute: async (args): Promise<Proposal> => {
+        guard.assertAction("propose_swap");
+        if (!ctx.account) throw new Error("The user must connect and sign in with their wallet before a swap can be proposed.");
+        return proposeSwap(args, ctx.account, ctx.conversationId);
+      },
+    }),
+
     risk_report: tool({
       description:
         "Full risk check of a NEAR token: contract powers and keys, holder concentration and dev share, Rhea liquidity and who can pull it, and taxes. Each check is green, yellow, red or not_checked, with numbers and sources. The UI shows it as a card. Use this for any 'is X safe' question.",

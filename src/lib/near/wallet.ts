@@ -2,15 +2,9 @@
 
 import type { NearConnector, NearWalletBase } from "@hot-labs/near-connect";
 import { NETWORK, RPC_URL } from "./config";
+import type { WalletTx } from "./tx";
 
-/** A transaction for the wallet to sign. The app builds these; the AI never does. */
-export type WalletTx = {
-  receiverId: string;
-  actions: Array<{
-    type: "FunctionCall";
-    params: { methodName: string; args: object; gas: string; deposit: string };
-  } | { type: "Transfer"; params: { deposit: string } }>;
-};
+export type { WalletTx };
 
 /** MyNearWallet shuts down 31 Oct 2026; NEAR CLI is a developer tool. */
 const EXCLUDED = ["mynearwallet", "near-cli"];
@@ -57,7 +51,7 @@ export async function disconnectWallet(): Promise<void> {
   await c.disconnect().catch(() => {});
 }
 
-function failedOnChain(o: FinalExecutionOutcome): boolean {
+export function failedOnChain(o: FinalExecutionOutcome): boolean {
   const s = o?.status as unknown;
   return typeof s === "object" && s !== null && "Failure" in s;
 }

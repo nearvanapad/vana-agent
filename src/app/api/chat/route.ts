@@ -51,7 +51,7 @@ export async function POST(req: Request) {
   }
 
   const guard = new Guard();
-  const tools = buildTools(guard);
+  const tools = buildTools(guard, { account: s.account, conversationId: id });
   // A resent message (retry) replaces the stored copy and everything after it.
   const stored = loadMessages(id);
   const at = stored.findIndex((m) => m.id === message.id);
@@ -66,10 +66,11 @@ export async function POST(req: Request) {
   // Saved now so the question survives a Stop or a dropped connection.
   saveMessages(id, messages);
 
-  const names = Object.keys(tools) as (keyof typeof tools)[];
+  // A guest can price swaps but not propose one: proposals belong to a signed-in wallet.
+  const names = (Object.keys(tools) as (keyof typeof tools)[]).filter((n) => s.account || n !== "propose_swap");
   const result = streamText({
     model: chatModel(Boolean(think)),
-    instructions: instructions({ account: s.account, now: new Date(), canSwap: false }),
+    instructions: instructions({ account: s.account, now: new Date(), canSwap: Boolean(s.account) }),
     messages: await convertToModelMessages(messages.slice(-HISTORY), { tools, ignoreIncompleteToolCalls: true }),
     tools,
     stopWhen: isStepCount(8),

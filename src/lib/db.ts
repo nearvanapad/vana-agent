@@ -44,6 +44,22 @@ const MIGRATIONS = [
      PRIMARY KEY (conversation_id, id)
    );
    CREATE INDEX messages_order ON messages (conversation_id, seq);`,
+  // A swap the agent proposed: what the user saw, then the real quote, the deposit and its outcome.
+  `CREATE TABLE swaps (
+     id TEXT PRIMARY KEY,
+     account TEXT NOT NULL,
+     conversation_id TEXT,
+     route TEXT NOT NULL,
+     status TEXT NOT NULL,
+     proposal TEXT NOT NULL,
+     quote TEXT,
+     deposit_address TEXT,
+     tx_hash TEXT,
+     result TEXT,
+     created_at INTEGER NOT NULL,
+     updated_at INTEGER NOT NULL
+   );
+   CREATE INDEX swaps_account ON swaps (account, created_at DESC);`,
 ];
 
 let db: Database.Database | null = null;

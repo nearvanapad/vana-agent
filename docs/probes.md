@@ -48,8 +48,11 @@ Checked against mainnet on 2 Nov 2026. Each section answers what the risk check 
 
 ## NEAR Intents 1Click — `https://1click.chaindefuser.com/v0`
 
-- **Down during the probe:** Cloudflare 521 (origin unreachable) all afternoon on 2 Nov. Re-probe before Phase 3. The swap UI must show an "Intents unavailable" state instead of failing silently.
-- Expected API, to be verified against the live service:
+- **Re-probed 5 Nov: up.** `/tokens`, dry and real `/quote`, `/status` and `/deposit/submit` all answer as below. (Down with Cloudflare 521 on 2 Nov, so the UI keeps an "Intents unavailable" path.)
+- Without `ONECLICK_JWT`, every quote carries a 0.2% app fee (`quoteRequest.appFees`), already taken out of `amountOut`.
+- Errors come back as `{message}`, e.g. 400 "No liquidity available". A dry quote with a `recipient`/`refundTo` account that doesn't exist answers 500.
+- A real quote's `depositAddress` is a fresh 64-hex implicit account: register it on the origin token (`storage_deposit`) before the `ft_transfer`.
+- API:
   - `GET /tokens` returns `[{assetId:"nep141:…", symbol, blockchain, decimals, price, contractAddress}]`.
   - `POST /quote` body:
     ```json
