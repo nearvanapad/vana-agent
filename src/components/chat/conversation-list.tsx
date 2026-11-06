@@ -49,7 +49,7 @@ export function ConversationList(props: {
         {props.items.length === 0 && <li className="px-3 py-2 text-xs text-text-2">No chats yet.</li>}
       </ul>
       <p className="px-1 text-xs text-text-2/80">
-        {props.signedIn ? "Chats are kept under your wallet account." : "Guest chats live in this browser. Sign in to keep them under your wallet."}
+        {props.signedIn ? "Chats are kept under your wallet account." : "Connect your wallet and sign in to chat. Your chats are kept under your wallet account."}
       </p>
     </nav>
   );
