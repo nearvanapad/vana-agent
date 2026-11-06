@@ -4,6 +4,7 @@ import { warmIndex } from "./risk/bundle";
 import { allLaunches } from "./risk/launchpad/nearly";
 import { allLaunches as nearvanaLaunches } from "./risk/launchpad/nearvana";
 import { prices, warmPools, whitelist } from "./sources/rhea";
+import { swapTokens } from "./swap/tokens";
 
 /**
  * Loads the slow shared data before anyone asks: both networks' Rhea pool lists, prices, the
@@ -24,6 +25,7 @@ async function once(): Promise<void> {
     ["nearvana launches", () => onNetwork(TESTNET, nearvanaLaunches)],
     ["sniper index", () => onNetwork(MAINNET, warmIndex)],
     ["testnet sniper index", () => onNetwork(TESTNET, warmIndex)],
+    ["swap tokens", () => swapTokens()],
   ];
   const results = await Promise.allSettled(jobs.map(([, run]) => run()));
   const failed = jobs.filter((_, i) => results[i]!.status === "rejected").map(([name]) => name);

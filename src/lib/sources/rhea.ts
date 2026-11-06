@@ -172,6 +172,12 @@ async function newClassicPools(idx: PoolIndex | null, token: string): Promise<Po
 /** Builds the pool index ahead of the first question (on server start, then before it expires). */
 export const warmPools = () => poolIndex().then(() => undefined);
 
+/** Every live pool on the current network, from the index (at most 10 minutes old). */
+export async function allPools(): Promise<{ built_at: string; pools: Pool[] }> {
+  const idx = await poolIndex();
+  return { built_at: idx.built_at, pools: idx.pools };
+}
+
 export async function poolsFor(token: string, knownDcl: string[] = []): Promise<Sourced<Pool[]> & { partial: boolean }> {
   const idx = await poolIndex().catch(() => null);
   let refs: { kind: Pool["kind"]; id: string }[];

@@ -7,6 +7,7 @@ import { networkOf, WALLET } from "@/lib/near/network";
 import { useSession } from "../session/use-session";
 import { QuoteCard, SwapCard } from "../chat/swap-card";
 import { usePane, type ProposalItem, type QuoteItem, type SwapForm } from "./pane-context";
+import { TokenPicker } from "./token-picker";
 
 const SLIPPAGE = [0.5, 1, 2];
 const FIELDS = ["from", "to", "amount"] as const;
@@ -73,10 +74,12 @@ export function SwapTab() {
         }}
         className="space-y-2 rounded-card border border-line bg-surface p-3"
       >
-        <Field label="You pay" hint='"NEAR" or a token contract'>
+        <Field label="You pay" hint="Pick a token or paste a contract">
           <div className="flex gap-2">
             <input value={v("amount")} onChange={(e) => set({ amount: e.target.value.replace(/[^\d.]/g, "") })} inputMode="decimal" placeholder="0.0" aria-label="Amount" className={clsx(INPUT, "w-28 shrink-0")} />
-            <input value={v("from")} onChange={(e) => set({ from: e.target.value })} placeholder="NEAR" aria-label="Pay with" spellCheck={false} autoCapitalize="none" className={clsx(INPUT, "min-w-0 flex-1")} />
+            <div className="min-w-0 flex-1">
+              <TokenPicker label="Pay with" value={v("from")} typing={Boolean(typed)} onChange={(from) => set({ from })} />
+            </div>
           </div>
         </Field>
         <div className="flex justify-center">
@@ -84,8 +87,8 @@ export function SwapTab() {
             <ArrowDownUp size={14} />
           </button>
         </div>
-        <Field label="You get" hint={WALLET.id === "testnet" ? "Testnet contract, e.g. a nearvana token" : "Contract id, e.g. usdt.tether-token.near"}>
-          <input value={v("to")} onChange={(e) => set({ to: e.target.value })} placeholder="token contract" aria-label="Receive" spellCheck={false} autoCapitalize="none" className={clsx(INPUT, "w-full")} />
+        <Field label="You get" hint={WALLET.id === "testnet" ? "Testnet tokens, nearvana ones first" : "Tokens with a Rhea pool"}>
+          <TokenPicker label="Receive" value={v("to")} typing={Boolean(typed)} onChange={(to) => set({ to })} />
         </Field>
         <div className="flex items-center justify-between gap-2 pt-1">
           <span className="text-xs text-text-2">Max slippage</span>
@@ -149,13 +152,13 @@ const INPUT = "rounded-well border border-line bg-bg px-3 py-2 font-mono text-sm
 
 function Field({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
   return (
-    <label className="block space-y-1">
+    <div className="block space-y-1">
       <span className="flex items-baseline justify-between gap-2 text-xs">
         <span className="text-text-2">{label}</span>
         <span className="truncate text-text-2/70">{hint}</span>
       </span>
       {children}
-    </label>
+    </div>
   );
 }
 

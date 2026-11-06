@@ -8,6 +8,7 @@ import { normalizeToken } from "../risk/report";
 import { ref, type SourceRef } from "../sources/http";
 import { swapAssets } from "../sources/oneclick";
 import { poolCount, prices, whitelist } from "../sources/rhea";
+import { swapTokens } from "../swap/tokens";
 import { stranger } from "./guard";
 
 export type TokenMatch = {
@@ -36,12 +37,13 @@ const GUESSES = (q: string) => [q, `${q}.near`, `${q}.tkn.near`, `${q}.nearlytra
  */
 export async function searchToken(query: string): Promise<{ query: string; matches: TokenMatch[]; sources: SourceRef[] }> {
   const q = query.trim().replace(/^\$/, "").toLowerCase();
-  const [px, verified, assets, nearly, nv] = await Promise.all([
+  const [px, verified, assets, nearly, nv, swappable] = await Promise.all([
     prices().catch(() => null),
     whitelist().catch(() => new Set<string>()),
     swapAssets().catch(() => null),
     onNetwork(MAINNET, nearlyLaunches).catch(() => null),
     onNetwork(TESTNET, nearvana.allLaunches).catch(() => null),
+    swapTokens().catch(() => null),
   ]);
   const sources: SourceRef[] = [];
   if (px) sources.push(ref(px.source, px.url, new Date(px.as_of)));
@@ -71,6 +73,14 @@ export async function searchToken(query: string): Promise<{ query: string; match
     if (!a.assetId.startsWith("nep141:")) continue;
     const token = a.assetId.slice("nep141:".length);
     if (a.symbol.toLowerCase() === q) consider(token, a.symbol, a.price, 4);
+  }
+
+  // Tokens with a Rhea pool on the swap network: the only list testnet has.
+  for (const t of swappable?.tokens ?? []) {
+    const sym = t.symbol.toLowerCase();
+    if (t.token === q) consider(t.token, t.symbol, t.price_usd, 5, t.launchpad);
+    else if (sym === q) consider(t.token, t.symbol, t.price_usd, 4, t.launchpad);
+    else if (q.length >= 2 && sym.startsWith(q)) consider(t.token, t.symbol, t.price_usd, 2, t.launchpad);
   }
 
   // Launchpad tokens, by symbol or by the first part of their account id.
