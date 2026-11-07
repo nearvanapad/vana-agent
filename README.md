@@ -9,7 +9,7 @@ Chat agent for NEAR. Ask whether a NEP-141 token is safe and get a plain-languag
 ```sh
 cp .env.example .env    # add LLM_API_KEY
 pnpm install
-pnpm dev                # http://localhost:3000
+pnpm dev                # http://localhost:3000 (landing), /app (the chat)
 ```
 
 Or `docker compose up --build`.

@@ -347,11 +347,18 @@ export function Landing() {
     // The landing is dark whatever the app's theme.
     <div data-theme="dark" className="relative min-h-screen overflow-x-clip bg-bg text-[15px] leading-normal text-text antialiased [--off:color-mix(in_srgb,var(--none)_40%,var(--line))]">
       <header className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between gap-4 border-b border-line/60 bg-bg/80 px-[5vw] backdrop-blur-[10px]">
-        <Link href="/" className="flex items-center gap-2.5 hover:no-underline">
+        <a
+          href="#"
+          onClick={(e) => {
+            e.preventDefault();
+            goTo(0);
+          }}
+          className="flex items-center gap-2.5"
+        >
           <Image src={vana} alt="" width={30} height={30} unoptimized className="size-[30px]" />
           <span className="font-display text-[22px] tracking-[0.04em] text-accent">VANA</span>
-        </Link>
-        <Link href="/" className={clsx(STICKER, "gap-2 rounded-full px-[18px] py-2 text-sm")}>
+        </a>
+        <Link href="/app" className={clsx(STICKER, "gap-2 rounded-full px-[18px] py-2 text-sm")}>
           Open app
         </Link>
       </header>
@@ -414,7 +421,7 @@ export function Landing() {
               <div ref={ph(0)} className="aspect-square w-[min(260px,32vh,56vw)]" />
               <Intro hero title="Is this NEAR token safe?" body="I check NEAR tokens, dig into who's behind them, and line up the swap when you're ready." />
               <div className="tx mt-1.5 flex flex-wrap justify-center gap-3" style={{ "--d": "1.2s" } as CSSProperties}>
-                <Link href="/" className={clsx(STICKER, "gap-2 rounded-full px-[22px] py-[11px] text-[15px]")}>
+                <Link href="/app" className={clsx(STICKER, "gap-2 rounded-full px-[22px] py-[11px] text-[15px]")}>
                   Ask VANA
                 </Link>
                 <button type="button" onClick={() => goTo(1)} className={clsx(QUIET, "gap-2 rounded-full px-[22px] py-[11px] text-[15px] whitespace-nowrap text-text")}>
@@ -771,10 +778,10 @@ export function Landing() {
             <span className="inline-flex items-center gap-1 rounded-full border border-ok/60 px-2.5 py-[3px] text-xs font-semibold whitespace-nowrap text-ok">✓ Unlocked</span>
           </Reveal>
           <div className="mt-1.5 flex flex-wrap gap-2.5">
-            <Link href="/" className={clsx(STICKER, "gap-2 rounded-full px-[22px] py-[11px] text-[15px]")}>
+            <Link href="/app" className={clsx(STICKER, "gap-2 rounded-full px-[22px] py-[11px] text-[15px]")}>
               <Wallet size={16} /> Connect wallet
             </Link>
-            <Link href="/" className={clsx(QUIET, "gap-2 rounded-full px-[22px] py-[11px] text-[15px] text-text")}>
+            <Link href="/app" className={clsx(QUIET, "gap-2 rounded-full px-[22px] py-[11px] text-[15px] text-text")}>
               <ArrowLeftRight size={16} /> Get {GATE_SYMBOL}
             </Link>
           </div>

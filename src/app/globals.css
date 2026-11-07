@@ -337,7 +337,7 @@ body {
 }
 
 /*
- * The landing page (/about): headings rise word by word, then the copy fades in word by word,
+ * The landing page (/): headings rise word by word, then the copy fades in word by word,
  * once their chapter scrolls in (data-in="1"). Each word carries its own delay in --d.
  */
 .tx {

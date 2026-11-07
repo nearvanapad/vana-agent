@@ -123,7 +123,7 @@ export function GateCard({ compact }: { compact?: boolean }) {
       </div>
       {swappable && signedIn && <p className="font-mono text-[0.7rem] break-all text-text-2/80">{token}</p>}
       {!compact && (
-        <Link href="/about" className="text-xs text-text-2 underline-offset-2 hover:text-accent-deep hover:underline">
+        <Link href="/" className="text-xs text-text-2 underline-offset-2 hover:text-accent-deep hover:underline">
           See how VANA works
         </Link>
       )}

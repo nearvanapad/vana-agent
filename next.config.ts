@@ -6,6 +6,10 @@ const nextConfig: NextConfig = {
   output: "standalone",
   // Native module, loaded at runtime on the server only.
   serverExternalPackages: ["better-sqlite3"],
+  // Chats used to live at the root: send old links (/?c=<id>) to the app.
+  redirects() {
+    return Promise.resolve([{ source: "/", has: [{ type: "query", key: "c" }], destination: "/app", permanent: true }]);
+  },
   headers() {
     return [
       {
