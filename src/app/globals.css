@@ -335,3 +335,63 @@ body {
     animation: none !important;
   }
 }
+
+/*
+ * The landing page (/about): headings rise word by word, then the copy fades in word by word,
+ * once their chapter scrolls in (data-in="1"). Each word carries its own delay in --d.
+ */
+.tx {
+  opacity: 0;
+  transform: translateY(14px);
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+[data-in="1"] .tx {
+  opacity: 1;
+  transform: none;
+  transition-delay: var(--d, 0s);
+}
+.tx[data-split] {
+  opacity: 1;
+  transform: none;
+  transition: none;
+}
+.tx .wm {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding: 0.06em 0 0.1em;
+  margin: -0.06em 0 -0.1em;
+}
+.tx .wi {
+  display: inline-block;
+  transform: translateY(110%) rotate(4deg);
+  transform-origin: 0 100%;
+  transition: transform 0.75s cubic-bezier(0.2, 0.85, 0.25, 1);
+}
+[data-in="1"] .tx .wi {
+  transform: none;
+  transition-delay: var(--d);
+}
+.tx .w {
+  opacity: 0;
+  filter: blur(5px);
+  transition:
+    opacity 0.45s ease,
+    filter 0.45s ease;
+}
+[data-in="1"] .tx .w {
+  opacity: 1;
+  filter: none;
+  transition-delay: var(--d);
+}
+@media (prefers-reduced-motion: reduce) {
+  .tx,
+  .tx .wi {
+    transform: none;
+  }
+  .tx .w {
+    filter: none;
+  }
+}

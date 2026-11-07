@@ -1,6 +1,7 @@
 "use client";
 
 import { clsx } from "clsx";
+import Link from "next/link";
 import { ArrowLeftRight, Check, Loader2, Lock, PenLine, RefreshCw, Wallet } from "lucide-react";
 import { usePane } from "@/components/pane/pane-context";
 import { useSession } from "@/components/session/use-session";
@@ -121,6 +122,11 @@ export function GateCard({ compact }: { compact?: boolean }) {
         )}
       </div>
       {swappable && signedIn && <p className="font-mono text-[0.7rem] break-all text-text-2/80">{token}</p>}
+      {!compact && (
+        <Link href="/about" className="text-xs text-text-2 underline-offset-2 hover:text-accent-deep hover:underline">
+          See how VANA works
+        </Link>
+      )}
     </div>
   );
 }
