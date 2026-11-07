@@ -4,7 +4,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { clsx } from "clsx";
 import { useEffect, useState, type ReactNode } from "react";
 import { useSession } from "@/components/session/use-session";
-import { STICKER } from "@/components/ui/styles";
+import { NEARVANA_INTRO, NearvanaLink } from "@/components/nearvana/nearvana";
+import { EYEBROW, STICKER } from "@/components/ui/styles";
 import { Mascot } from "@/components/vana/mascot";
 
 const SEEN = "vana:notice-seen";
@@ -92,6 +93,10 @@ export function Notice() {
                 </li>
               ))}
             </ul>
+            <div className="flex w-full flex-col gap-2 text-left">
+              <span className={clsx(EYEBROW, "text-text-2")}>New here? Try our launchpad</span>
+              <NearvanaLink blurb={NEARVANA_INTRO} />
+            </div>
             <Dialog.Close className={clsx(STICKER, "w-full rounded-full px-4 py-[11px] text-[15px]")}>Got it</Dialog.Close>
           </Dialog.Content>
         </Dialog.Overlay>
