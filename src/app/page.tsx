@@ -1,10 +1,8 @@
 import type { Metadata } from "next";
 import { Landing } from "@/components/landing/landing";
+import { pageMetadata, SITE_TITLE } from "@/lib/share/site";
 
-export const metadata: Metadata = {
-  title: "VANA — is this NEAR token safe?",
-  description: "VANA checks NEAR tokens, digs into who's behind them, and lines up the swap when you're ready. Your wallet signs, never the AI.",
-};
+export const metadata: Metadata = pageMetadata({ title: SITE_TITLE, path: "/" });
 
 export default function Home() {
   return <Landing />;

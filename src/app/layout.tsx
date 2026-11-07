@@ -2,12 +2,18 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { bowlby, jetbrains, rubik } from "./fonts";
 import "./globals.css";
+import { SITE_DESCRIPTION, SITE_NAME, SITE_TITLE, SITE_URL } from "@/lib/share/site";
 import { THEME_SCRIPT } from "@/lib/theme";
 import { Providers } from "./providers";
 
+// The share image comes from `opengraph-image.tsx` beside this file.
 export const metadata: Metadata = {
-  title: "VANA — NEAR token agent",
-  description: "Ask VANA if a NEAR token is safe, then swap it through NEAR Intents. Your wallet signs, never the AI.",
+  metadataBase: SITE_URL,
+  applicationName: SITE_NAME,
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  openGraph: { siteName: SITE_NAME, locale: "en_US", type: "website", title: SITE_TITLE, description: SITE_DESCRIPTION },
+  twitter: { card: "summary_large_image", title: SITE_TITLE, description: SITE_DESCRIPTION },
 };
 
 // Lets the mobile tab bar pad itself clear of the home indicator.
