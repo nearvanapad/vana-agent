@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
@@ -91,4 +92,17 @@ export async function siteCard() {
     </div>,
     { ...OG_SIZE, fonts: await fonts() },
   );
+}
+
+let version: Promise<string> | null = null;
+
+/**
+ * A hash of the card's pixels. Share links name the image with it, so a changed card gets a new
+ * URL and chat apps and X fetch it again instead of showing the one they cached.
+ */
+export function cardVersion() {
+  version ??= siteCard()
+    .then((card) => card.arrayBuffer())
+    .then((png) => createHash("sha256").update(Buffer.from(png)).digest("hex").slice(0, 12));
+  return version;
 }

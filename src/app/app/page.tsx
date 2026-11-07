@@ -1,12 +1,12 @@
-import type { Metadata } from "next";
 import { ChatApp } from "@/components/chat/chat-app";
-import { pageMetadata } from "@/lib/share/site";
+import { pageMetadata } from "@/lib/share/metadata";
 
-export const metadata: Metadata = pageMetadata({
-  title: "VANA — NEAR token agent",
-  description: "Ask VANA if a NEAR token is safe, then swap it. Your wallet signs, never the AI.",
-  path: "/app",
-});
+export const generateMetadata = () =>
+  pageMetadata({
+    title: "VANA — NEAR token agent",
+    description: "Ask VANA if a NEAR token is safe, then swap it. Your wallet signs, never the AI.",
+    path: "/app",
+  });
 
 export default function App() {
   return <ChatApp />;
