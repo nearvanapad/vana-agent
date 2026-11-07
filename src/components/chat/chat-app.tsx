@@ -13,6 +13,7 @@ import { STICKER } from "@/components/ui/styles";
 import { WalletPanel } from "@/components/wallet/connect-button";
 import { WALLET } from "@/lib/near/network";
 import Image from "next/image";
+import Link from "next/link";
 import { PaneProvider } from "@/components/pane/pane-context";
 import { PaneDocked, PaneOverlay, PaneTabBar, PaneTabs } from "@/components/pane/pane";
 import { ChatView } from "./chat-view";
@@ -152,9 +153,11 @@ export function ChatApp() {
     <PaneProvider key={active ?? "none"} conversationId={active}>
       <div className="flex h-dvh overflow-hidden text-[clamp(14px,calc(0.4vw+12.5px),15px)]">
         <aside className="hidden h-dvh w-66 shrink-0 flex-col border-r border-line bg-surface/40 md:flex">
-          <h1 className="flex h-15 shrink-0 items-center gap-2.5 pr-3 pl-4">
-            <Logo size={34} />
-            <span className="font-display text-[22px] tracking-[0.04em] text-accent-deep">VANA</span>
+          <h1 className="flex h-15 shrink-0 items-center pr-3 pl-4">
+            <Link href="/" title="VANA home" className="flex items-center gap-2.5 rounded-[10px]">
+              <Logo size={34} />
+              <span className="font-display text-[22px] tracking-[0.04em] text-accent-deep">VANA</span>
+            </Link>
           </h1>
           {sidebar}
         </aside>
@@ -164,9 +167,11 @@ export function ChatApp() {
             <Dialog.Overlay className="fixed inset-0 z-40 bg-scrim md:hidden" />
             <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] flex-col border-r border-line bg-bg shadow-[12px_0_32px_rgb(0_0_0/0.35)] md:hidden">
               <div className="flex h-15 shrink-0 items-center gap-2.5 pr-3 pl-4">
-                <Dialog.Title className="flex flex-1 items-center gap-2.5 font-display text-[22px] tracking-[0.04em] text-accent-deep">
-                  <Logo size={34} />
-                  VANA
+                <Dialog.Title className="flex flex-1 font-display text-[22px] tracking-[0.04em] text-accent-deep">
+                  <Link href="/" title="VANA home" className="flex items-center gap-2.5 rounded-[10px]">
+                    <Logo size={34} />
+                    VANA
+                  </Link>
                 </Dialog.Title>
                 <Dialog.Close className="grid size-10 place-items-center rounded-[10px] text-text-2 hover:bg-surface-2" aria-label="Close menu">
                   <X size={18} />
