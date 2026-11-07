@@ -12,8 +12,9 @@ import vana from "../chat/vana.gif";
 
 /*
  * The landing page: seven chapters, each a tall section with a sticky stage. Scrolling through a
- * chapter scrubs its demo (typing, checks landing, links drawn, the wallet signing), and Vana flies
- * from chapter to chapter, changing mood as the story goes.
+ * chapter scrubs its demo (typing, checks landing, links drawn, the wallet signing). Every chapter has
+ * its own Vana; once a chapter has played out, scrolling on grows a vine from its Vana to the next
+ * one, who pops out where it lands. The Vana in view takes the chapter's mood.
  */
 
 type Level = "yellow" | "green" | "not_checked";
@@ -97,8 +98,45 @@ const ASK = "Is SWEAT safe?";
 const clamp = (v: number) => Math.min(1, Math.max(0, v));
 const steps = (p: number, at: number[]) => at.filter((x) => p >= x).length;
 
-type Scrub = { active: number; askChars: number; ask: number; check: number; links: number; report: number; swap: number; gate: number };
-const START: Scrub = { active: 0, askChars: 0, ask: 0, check: 0, links: 0, report: 0, swap: 0, gate: 0 };
+type Scrub = { active: number; popped: number; askChars: number; ask: number; check: number; links: number; report: number; swap: number; gate: number };
+const START: Scrub = { active: 0, popped: 0, askChars: 0, ask: 0, check: 0, links: 0, report: 0, swap: 0, gate: 0 };
+
+/** Where the leaves sit along a vine, as fractions of its length. */
+const LEAVES = [0.07, 0.15, 0.24, 0.33, 0.42, 0.51, 0.6, 0.69, 0.78, 0.87, 0.94];
+const easeOut = (x: number) => 1 - (1 - x) ** 3;
+type Pt = { x: number; y: number };
+
+/** A wavy vine from A down to B: a smooth curve through points swinging from side to side, stirring a little over time. */
+function vinePath(A: Pt, B: Pt, j: number, now: number): string {
+  const dy = B.y - A.y;
+  const dx = B.x - A.x;
+  const len = Math.hypot(dx, dy) || 1;
+  const nx = -dy / len;
+  const ny = dx / len;
+  const amp = Math.min(130, innerWidth * 0.11);
+  const drop = Math.min(70, Math.abs(dy) * 0.08);
+  const a1 = { x: A.x, y: A.y + drop };
+  const b1 = { x: B.x, y: B.y - drop * 1.4 };
+  const n = Math.max(3, Math.min(7, Math.round(len / 300)));
+  const pts: Pt[] = [A, a1];
+  for (let k = 1; k < n; k++) {
+    const f = k / n;
+    const side = (k + j) % 2 ? 1 : -1;
+    const off = amp * (side * (0.75 + 0.25 * Math.sin(k * 2.3 + j * 1.1)) + 0.12 * Math.sin(now * 0.0008 + k * 1.7 + j));
+    pts.push({ x: a1.x + (b1.x - a1.x) * f + nx * off, y: a1.y + (b1.y - a1.y) * f + ny * off });
+  }
+  pts.push(b1, B);
+  // Catmull-Rom through the points, as cubic Béziers.
+  let d = `M${A.x.toFixed(1)} ${A.y.toFixed(1)}`;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p1 = pts[i]!;
+    const p2 = pts[i + 1]!;
+    const p0 = pts[i - 1] ?? p1;
+    const p3 = pts[i + 2] ?? p2;
+    d += `C${(p1.x + (p2.x - p0.x) / 6).toFixed(1)} ${(p1.y + (p2.y - p0.y) / 6).toFixed(1)} ${(p2.x - (p3.x - p1.x) / 6).toFixed(1)} ${(p2.y - (p3.y - p1.y) / 6).toFixed(1)} ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+  }
+  return d;
+}
 
 function moodOf(n: Scrub): Mood {
   return (
@@ -163,7 +201,7 @@ function Intro({ title, body, hero }: { title: string; body: string; hero?: bool
         data-split
         className={clsx(
           "tx m-0 font-display font-normal text-balance",
-          hero ? "text-[clamp(30px,6vw,80px)] leading-[1.02] tracking-[0.01em]" : "text-[clamp(22px,3.8vw,50px)] leading-[1.05]",
+          hero ? "text-[clamp(30px,6vw,80px)] leading-[1.02] tracking-[0.01em]" : "text-[clamp(17.6px,3.04vw,40px)] leading-[1.05]",
         )}
       >
         {words(title, 0, 0.08, true)}
@@ -189,6 +227,7 @@ function Chapter({
   label,
   secRef,
   phRef,
+  vana,
   title,
   body,
   demoClass,
@@ -198,6 +237,7 @@ function Chapter({
   label: string;
   secRef: (el: HTMLElement | null) => void;
   phRef: (el: HTMLDivElement | null) => void;
+  vana: ReactNode;
   title: string;
   body: string;
   demoClass?: string;
@@ -210,9 +250,12 @@ function Chapter({
           data-fit="full"
           className="relative mx-auto grid w-full max-w-[1520px] origin-center grid-cols-[repeat(auto-fit,minmax(min(100%,370px),1fr))] items-center gap-x-10 gap-y-7 px-[4vw] py-3"
         >
-          <div className="flex items-center gap-[clamp(16px,2.5vw,32px)]">
-            <div ref={phRef} className="min-h-[88px] flex-[0_0_clamp(88px,15vw,240px)] self-stretch" />
-            <div className="flex max-w-[440px] min-w-0 flex-1 flex-col gap-3.5">
+          {/* Vana beside the copy; on tablets, above it. */}
+          <div className="flex items-center gap-[clamp(16px,2.5vw,32px)] tab:w-full tab:flex-col tab:justify-center tab:text-center">
+            <div ref={phRef} className="min-h-[88px] flex-[0_0_clamp(88px,15vw,240px)] self-stretch tab:size-[clamp(170px,20vw,220px)] tab:min-h-0 tab:flex-none tab:self-center">
+              {vana}
+            </div>
+            <div className="flex max-w-[440px] min-w-0 flex-1 flex-col gap-3.5 tab:mx-auto tab:w-full tab:items-center">
               <Intro title={title} body={body} />
             </div>
           </div>
@@ -227,22 +270,79 @@ function Chapter({
 
 export function Landing() {
   const [s, setS] = useState<Scrub>(START);
-  const [wide, setWide] = useState(true);
   const secs = useRef<(HTMLElement | null)[]>([]);
   const phs = useRef<(HTMLDivElement | null)[]>([]);
-  const flyer = useRef<HTMLDivElement>(null);
+  const vineLayer = useRef<SVGSVGElement>(null);
   const stateRef = useRef(s);
   stateRef.current = s;
 
   useEffect(() => {
-    const onResize = () => setWide(innerWidth >= 1000);
-    onResize();
-    addEventListener("resize", onResize);
     let heroIn = false;
     const heroT = setTimeout(() => (heroIn = true), 300);
-    let cur: { x: number; y: number; w: number } | null = null;
     let fits: HTMLElement[] = [];
     let raf = 0;
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Nothing grows until the reader has scrolled; a page opened part-way down counts as scrolled.
+    const scroll0 = scrollY;
+    let popped = 0;
+    const vines = Array.from(vineLayer.current?.querySelectorAll<SVGGElement>("[data-vine]") ?? []).map((g) => ({
+      g,
+      on: false,
+      paths: Array.from(g.querySelectorAll<SVGPathElement>("[data-stem]")),
+      leaves: Array.from(g.querySelectorAll<SVGGElement>("[data-leaf]")),
+      bud: g.querySelector<SVGCircleElement>("[data-bud]")!,
+    }));
+
+    /** The square Vana fills in chapter i's slot. */
+    const box = (i: number) => {
+      const el = phs.current[i];
+      if (!el) return null;
+      const r = el.getBoundingClientRect();
+      const w = Math.min(r.width, r.height);
+      return { x: r.left + (r.width - w) / 2, y: r.top + (r.height - w) / 2, w };
+    };
+
+    /** The vine into chapter j, grown to `grow` of its length: from under the last Vana to behind the next. */
+    const drawVine = (j: number, grow: number, now: number, vh: number) => {
+      const v = vines[j - 1];
+      if (!v) return;
+      const a = box(j - 1);
+      const b = box(j);
+      const hide = () => {
+        if (!v.on) return;
+        v.g.style.display = "none";
+        v.on = false;
+      };
+      if (!a || !b || grow <= 0) return hide();
+      const A = { x: a.x + a.w / 2, y: a.y + a.w * 0.86 };
+      const B = { x: b.x + b.w / 2, y: b.y + b.w * 0.5 };
+      if (Math.max(A.y, B.y) < -150 || Math.min(A.y, B.y) > vh + 150) return hide();
+      if (!v.on) {
+        v.g.style.display = "";
+        v.on = true;
+      }
+      const d = vinePath(A, B, j, now);
+      for (const p of v.paths) p.setAttribute("d", d);
+      const stem = v.paths[1]!;
+      const L = stem.getTotalLength() || 1;
+      for (const p of v.paths) p.style.strokeDasharray = grow >= 1 ? "none" : `${(grow * L).toFixed(1)} ${(L + 10).toFixed(1)}`;
+      v.leaves.forEach((lf, i) => {
+        const f = LEAVES[i]!;
+        const sc = clamp((grow - f) / 0.06);
+        if (sc <= 0) return lf.setAttribute("transform", "scale(0)");
+        const p0 = stem.getPointAtLength(f * L);
+        const p1 = stem.getPointAtLength(Math.min(L, f * L + 2));
+        const ang = (Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180) / Math.PI + (i % 2 ? 58 : -58) + 6 * Math.sin(now * 0.0015 + i);
+        const size = sc * (0.85 + (0.35 * ((i * 7) % 3)) / 2);
+        lf.setAttribute("transform", `translate(${p0.x.toFixed(1)} ${p0.y.toFixed(1)}) rotate(${ang.toFixed(1)}) scale(${size.toFixed(3)})`);
+      });
+      if (grow < 1) {
+        const tip = stem.getPointAtLength(grow * L);
+        v.bud.style.display = "";
+        v.bud.setAttribute("cx", tip.x.toFixed(1));
+        v.bud.setAttribute("cy", tip.y.toFixed(1));
+      } else v.bud.style.display = "none";
+    };
 
     const tick = () => {
       raf = requestAnimationFrame(tick);
@@ -289,9 +389,25 @@ export function Landing() {
       ps.forEach((x, i) => {
         if (x.top <= vh * 0.5) active = i;
       });
+      // The vine into chapter j starts once chapter j-1 has played out, and grows as chapter j scrolls up
+      // the screen; once chapter j is well in, its Vana pops out and that vine stays.
+      const scrolled = scrollY !== scroll0 || scroll0 > 0;
+      let reach = 0;
+      ps.forEach((x, i) => {
+        if (x.top <= vh * 0.3) reach = i;
+      });
+      if (scrolled) popped = Math.max(popped, reach);
+      const now = performance.now();
+      for (let j = 1; j < ps.length; j++) {
+        const ready = !reduce && scrolled && (ps[j - 1]?.p ?? 0) >= 0.999;
+        const grow = j <= popped ? 1 : ready ? easeOut(clamp((vh * 0.92 - ps[j]!.top) / (vh * 0.62))) : 0;
+        drawVine(j, grow, now, vh);
+      }
+
       const a = ps[1]?.p ?? 0;
       const next: Scrub = {
         active,
+        popped,
         askChars: Math.round(clamp((a - 0.05) / 0.35) * ASK.length),
         ask: steps(a, [0.5, 0.66, 0.82]),
         check: Math.min(7, Math.floor(clamp(((ps[2]?.p ?? 0) - 0.06) / 0.82) * 7)),
@@ -302,30 +418,11 @@ export function Landing() {
       };
       const prev = stateRef.current;
       if ((Object.keys(next) as (keyof Scrub)[]).some((k) => next[k] !== prev[k])) setS(next);
-
-      // Vana eases towards the slot of the chapter in view.
-      const ph = phs.current[active];
-      const v = flyer.current;
-      if (ph && v) {
-        const r = ph.getBoundingClientRect();
-        const sz = Math.min(r.width, r.height);
-        const tx = r.left + (r.width - sz) / 2;
-        const ty = r.top + (r.height - sz) / 2;
-        if (!cur) {
-          cur = { x: tx, y: ty, w: sz };
-          v.style.opacity = "1";
-        }
-        cur.x += (tx - cur.x) * 0.14;
-        cur.y += (ty - cur.y) * 0.14;
-        cur.w += (sz - cur.w) * 0.14;
-        v.style.transform = `translate3d(${cur.x.toFixed(1)}px,${cur.y.toFixed(1)}px,0) scale(${(cur.w / 400).toFixed(4)})`;
-      }
     };
     raf = requestAnimationFrame(tick);
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(heroT);
-      removeEventListener("resize", onResize);
     };
   }, []);
 
@@ -337,6 +434,15 @@ export function Landing() {
   };
   const sec = (i: number) => (el: HTMLElement | null) => void (secs.current[i] = el);
   const ph = (i: number) => (el: HTMLDivElement | null) => void (phs.current[i] = el);
+  // Chapter i's Vana: hidden until the vine reaches it, and only the one in view moves with the story.
+  const vanaAt = (i: number) => (
+    <Mascot
+      mood={s.active === i ? moodOf(s) : "idle"}
+      size={240}
+      track={s.active === i}
+      className={clsx("size-full drop-shadow-[0_14px_28px_rgb(0_0_0/0.45)]", i <= s.popped ? "v-pop" : "scale-0")}
+    />
+  );
 
   const sent = s.ask >= 1;
   const typed = sent ? "" : ASK.slice(0, s.askChars);
@@ -363,9 +469,22 @@ export function Landing() {
         </Link>
       </header>
 
-      <div ref={flyer} aria-hidden className="pointer-events-none fixed top-0 left-0 z-30 size-[400px] origin-top-left opacity-0 drop-shadow-[0_18px_36px_rgb(0_0_0/0.45)] transition-opacity duration-[400ms]">
-        <Mascot mood={moodOf(s)} size={400} track />
-      </div>
+      <Backdrop />
+      <svg ref={vineLayer} aria-hidden className="pointer-events-none fixed inset-0 z-0 size-full overflow-visible">
+        {RAIL.slice(1).map((r) => (
+          <g key={r} data-vine style={{ display: "none" }}>
+            <path data-stem fill="none" stroke="#0b1417" strokeWidth={7} strokeLinecap="round" strokeLinejoin="round" />
+            <path data-stem fill="none" stroke="#a8d9bb" strokeWidth={3.2} strokeLinecap="round" strokeLinejoin="round" />
+            {LEAVES.map((f) => (
+              <g key={f} data-leaf transform="scale(0)">
+                <ellipse cx="9" cy="0" rx="9" ry="3.8" fill="#3d8a5c" stroke="#0b1417" strokeWidth={1.3} />
+                <path d="M1 0H14" stroke="#69de8a" strokeWidth={0.9} strokeLinecap="round" opacity={0.7} />
+              </g>
+            ))}
+            <circle data-bud r={5} fill="#97ffb9" stroke="#0b1417" strokeWidth={1.6} />
+          </g>
+        ))}
+      </svg>
 
       <nav
         aria-label="Chapters"
@@ -392,41 +511,22 @@ export function Landing() {
       {/* 00 · Hero */}
       <section ref={sec(0)} aria-label="Start" className="relative" style={{ height: `${HEIGHTS[0]}vh`, "--p": 0, "--pp": 0 } as CSSProperties}>
         <div className="sticky top-0 flex h-screen items-center justify-center overflow-hidden py-16">
-          {wide && (
-            <div aria-hidden className="pointer-events-none absolute inset-0">
-              {(
-                [
-                  ["left-[4%] top-[24%]", -340, -4, "bg-warn", "SWEAT", false],
-                  ["left-[5%] top-[82%]", -620, 3, "bg-bad", "BLACKDRAGON", false],
-                  ["left-[14%] top-[14%]", -180, 2, "bg-ok", "USDC", true],
-                  ["right-[4%] top-[28%]", -520, 4, "bg-none", "SHITZU", false],
-                  ["right-[5%] top-[84%]", -260, -3, "bg-ok", "NEAR", true],
-                  ["right-[13%] top-[14%]", -420, -2, "bg-accent", GATE_SYMBOL, false],
-                ] as const
-              ).map(([pos, drift, tilt, dot, label, small]) => (
-                <div key={label} className={clsx("absolute", pos, small && "opacity-70")} style={{ transform: `translateY(calc(var(--pp) * ${drift}px)) rotate(${tilt}deg)` }}>
-                  <span className={clsx("flex items-center gap-2 rounded-full border border-line bg-surface font-mono", small ? "px-3 py-1.5 text-xs" : "px-3.5 py-[7px] text-[13px]")}>
-                    <span className={clsx("size-2 rounded-full", dot)} />
-                    {label}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
           <div data-fit="1" className="relative z-[1] origin-center">
-            <div
-              className="flex flex-col items-center gap-5 px-6 py-4 text-center"
-              style={{ opacity: "calc(1 - var(--p) * 1.8)", transform: "translateY(calc(var(--p) * -90px))" }}
-            >
-              <div ref={ph(0)} className="aspect-square w-[min(260px,32vh,56vw)]" />
-              <Intro hero title="Is this NEAR token safe?" body="I check NEAR tokens, dig into who's behind them, and line up the swap when you're ready." />
-              <div className="tx mt-1.5 flex flex-wrap justify-center gap-3" style={{ "--d": "1.2s" } as CSSProperties}>
-                <Link href="/app" className={clsx(STICKER, "gap-2 rounded-full px-[22px] py-[11px] text-[15px]")}>
-                  Ask VANA
-                </Link>
-                <button type="button" onClick={() => goTo(1)} className={clsx(QUIET, "gap-2 rounded-full px-[22px] py-[11px] text-[15px] whitespace-nowrap text-text")}>
-                  See how it works <ArrowDown size={16} />
-                </button>
+            <div className="flex flex-col items-center gap-5 px-6 py-4 text-center" style={{ transform: "translateY(calc(var(--p) * -90px))" }}>
+              <div ref={ph(0)} className="aspect-square w-[min(260px,32vh,56vw)]">
+                {vanaAt(0)}
+              </div>
+              {/* The copy fades as you scroll on; Vana stays, since the first vine grows from her. */}
+              <div className="flex flex-col items-center gap-5" style={{ opacity: "calc(1 - var(--p) * 1.8)" }}>
+                <Intro hero title="Is this NEAR token safe?" body="I check NEAR tokens, dig into who's behind them, and line up the swap when you're ready." />
+                <div className="tx mt-1.5 flex flex-wrap justify-center gap-3" style={{ "--d": "1.2s" } as CSSProperties}>
+                  <Link href="/app" className={clsx(STICKER, "gap-2 rounded-full px-[22px] py-[11px] text-[15px]")}>
+                    Ask VANA
+                  </Link>
+                  <button type="button" onClick={() => goTo(1)} className={clsx(QUIET, "gap-2 rounded-full px-[22px] py-[11px] text-[15px] whitespace-nowrap text-text")}>
+                    See how it works <ArrowDown size={16} />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -434,7 +534,7 @@ export function Landing() {
       </section>
 
       {/* 01 · Ask */}
-      <Chapter index={1} label="ask" secRef={sec(1)} phRef={ph(1)} title="Ask about any token." body="A symbol, a contract, or a ticker you half-remember from a group chat. I'll figure it out.">
+      <Chapter index={1} label="ask" secRef={sec(1)} phRef={ph(1)} vana={vanaAt(1)} title="Ask about any token." body="A symbol, a contract, or a ticker you half-remember from a group chat. I'll figure it out.">
         <div className={clsx(CARD, "flex h-[400px] flex-col overflow-hidden")}>
           <div className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-line px-4">
             <span className="text-sm font-medium">{sent ? ASK : "New chat"}</span>
@@ -473,7 +573,7 @@ export function Landing() {
       </Chapter>
 
       {/* 02 · Check */}
-      <Chapter index={2} label="check" secRef={sec(2)} phRef={ph(2)} title="Seven checks, the same for every token." body="Read-only, public chain data, zero vibes. I ask the same seven questions of every token, even the cute ones.">
+      <Chapter index={2} label="check" secRef={sec(2)} phRef={ph(2)} vana={vanaAt(2)} title="Seven checks, the same for every token." body="Read-only, public chain data, zero vibes. I ask the same seven questions of every token, even the cute ones.">
         <div className={clsx(CARD, "overflow-hidden")}>
           <div className="flex flex-col gap-2.5 border-b border-line px-[18px] py-3.5">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
@@ -540,7 +640,7 @@ export function Landing() {
       </Chapter>
 
       {/* 03 · Early buyers */}
-      <Chapter index={3} label="early-buyers" secRef={sec(3)} phRef={ph(3)} title="Is the dev hiding among the first buyers?" body="Devs love buying their own launch from a fresh wallet. I follow the funding and say hi.">
+      <Chapter index={3} label="early-buyers" secRef={sec(3)} phRef={ph(3)} vana={vanaAt(3)} title="Is the dev hiding among the first buyers?" body="Devs love buying their own launch from a fresh wallet. I follow the funding and say hi.">
         <div className={clsx(CARD, "flex flex-col gap-3 px-[18px] py-4")}>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
             <span className="font-mono text-[13px] font-semibold">rug.vanarug4hgzsi.testnet</span>
@@ -614,7 +714,7 @@ export function Landing() {
       </Chapter>
 
       {/* 04 · Answer */}
-      <Chapter index={4} label="report" secRef={sec(4)} phRef={ph(4)} title="Every number has a source." body="No “trust me bro.” Every figure I give you comes with where I read it and when.">
+      <Chapter index={4} label="report" secRef={sec(4)} phRef={ph(4)} vana={vanaAt(4)} title="Every number has a source." body="No “trust me bro.” Every figure I give you comes with where I read it and when.">
         <div className="flex flex-col gap-3">
           <Reveal on={s.report >= 1} className="flex items-center gap-2 text-[13px] text-text-2">
             <Check size={14} strokeWidth={2.5} className="text-accent" /> Checked token.sweat · 7 checks · 6 sources
@@ -655,7 +755,7 @@ export function Landing() {
       </Chapter>
 
       {/* 05 · Swap */}
-      <Chapter index={5} label="swap" secRef={sec(5)} phRef={ph(5)} title="Your wallet signs, never the AI." body="I line up the best quote I can find. The approve button stays in your wallet, where it belongs.">
+      <Chapter index={5} label="swap" secRef={sec(5)} phRef={ph(5)} vana={vanaAt(5)} title="Your wallet signs, never the AI." body="I line up the best quote I can find. The approve button stays in your wallet, where it belongs.">
         <div className="relative flex flex-col gap-3">
           <Reveal on={s.swap >= 1} className="flex justify-end">
             <div className="max-w-[85%] rounded-card rounded-br-md bg-bubble px-4 py-2.5">Swap 5 NEAR to SWEAT</div>
@@ -744,7 +844,7 @@ export function Landing() {
         index={6}
         label="access"
         secRef={sec(6)}
-        phRef={ph(6)}
+        phRef={ph(6)} vana={vanaAt(6)}
         demoClass="max-w-[460px]"
         title={`I'm for ${GATE_SYMBOL} holders`}
         body={`Hold ${GATE_MIN.toLocaleString("en-US")} ${GATE_SYMBOL} to chat with me and check tokens. Swaps are open to everyone. I'm picky, not snobby.`}
@@ -807,5 +907,85 @@ function Cite({ on, children }: { on: boolean; children: ReactNode }) {
     <span className={clsx("ml-1 inline-block rounded-md px-1.5 align-[2px] font-mono text-[11px] text-accent transition-colors duration-300", on ? "bg-accent/15" : "bg-surface-2")}>
       {children}
     </span>
+  );
+}
+
+/** A small lotus, drawn round (0, 0). */
+function Bloom({ at, scale, delay }: { at: [number, number]; scale: number; delay: number }) {
+  return (
+    <g transform={`translate(${at[0]} ${at[1]}) scale(${scale})`} className="bgv-leaf" style={{ animationDelay: `${delay}s` }}>
+      <g fill="#97ffb9" fillOpacity={0.35} stroke="#69de8a" strokeOpacity={0.5} strokeWidth={0.4}>
+        <path d="M0 2C-5 1.5-7-1-6.5-2.5C-4-2.5-1.5-.5 0 2Z" />
+        <path d="M0 2C5 1.5 7-1 6.5-2.5C4-2.5 1.5-.5 0 2Z" />
+        <path d="M0 2C-3.5 0-4.2-3.5-3.5-5C-1.5-4-.2-1.5 0 2Z" />
+        <path d="M0 2C3.5 0 4.2-3.5 3.5-5C1.5-4 .2-1.5 0 2Z" />
+        <path d="M0-6.5C1.8-4 1.8-.5 0 2C-1.8-.5-1.8-4 0-6.5Z" />
+      </g>
+    </g>
+  );
+}
+
+type Leaf = [x: number, y: number, angle: number, delay: number];
+const EDGE_LEFT: Leaf[] = [
+  [70, 200, -30, 1.2],
+  [118, 300, 40, 1.5],
+  [150, 440, -20, 1.8],
+  [130, 600, 35, 2.1],
+  [90, 780, -40, 2.4],
+  [120, 690, 20, 2.6],
+];
+const EDGE_RIGHT: Leaf[] = [
+  [1380, 170, 30, 1.3],
+  [1330, 330, -35, 1.6],
+  [1300, 470, 25, 1.9],
+  [1320, 640, -30, 2.2],
+  [1370, 820, 40, 2.5],
+  [1340, 560, -15, 2.7],
+];
+
+/** The fixed backdrop: vines that draw themselves down both edges of the screen, and a soft dark pool behind the copy. */
+function Backdrop() {
+  const stem = (d: string, opacity: number, width: number, delay: number) => (
+    <path className="bgv-draw" d={d} stroke="#a8d9bb" strokeOpacity={opacity} strokeWidth={width} style={{ animationDelay: `${delay}s` }} />
+  );
+  const leaves = (list: Leaf[]) =>
+    list.map(([x, y, a, delay]) => (
+      <ellipse
+        key={`${x}-${y}`}
+        className="bgv-leaf"
+        cx={x}
+        cy={y}
+        rx={11}
+        ry={4.5}
+        transform={`rotate(${a} ${x} ${y})`}
+        fill="#2c6245"
+        fillOpacity={0.55}
+        stroke="#69de8a"
+        strokeOpacity={0.35}
+        strokeWidth={1}
+        style={{ animationDelay: `${delay}s` }}
+      />
+    ));
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
+      <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" className="absolute inset-0 block size-full">
+        <g className="bgv-sway l" fill="none" strokeLinecap="round">
+          {stem("M-20 110C120 190 60 370 160 470S150 760 60 940", 0.4, 2, 0)}
+          {stem("M-30 520C80 560 150 640 115 760S180 900 250 960", 0.22, 1.4, 0.4)}
+          {stem("M380 -20C400 50 350 90 420 140", 0.2, 1.2, 0.8)}
+          {leaves(EDGE_LEFT)}
+          <Bloom at={[160, 470]} scale={3} delay={2.8} />
+        </g>
+        <g className="bgv-sway r" fill="none" strokeLinecap="round">
+          {stem("M1460 50C1320 150 1400 320 1290 440S1320 700 1400 940", 0.4, 2, 0.2)}
+          {stem("M1470 380C1360 420 1300 520 1350 640S1300 820 1220 930", 0.22, 1.4, 0.6)}
+          {stem("M1080 -20C1060 40 1110 80 1050 130", 0.2, 1.2, 1)}
+          {leaves(EDGE_RIGHT)}
+          <Bloom at={[1290, 440]} scale={3} delay={3} />
+          <Bloom at={[1050, 130]} scale={2.2} delay={3.2} />
+        </g>
+      </svg>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_46%_42%_at_50%_52%,rgb(10_22_18/0.7),rgb(10_22_18/0.25)_60%,transparent_80%)]" />
+    </div>
   );
 }

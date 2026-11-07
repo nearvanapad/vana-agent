@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Tablets and small laptops, where the landing stacks Vana above each chapter's copy. */
+@custom-variant tab (@media (min-width: 700px) and (max-width: 1279px));
+
 /*
  * Brand palette, both themes: the only place colours are written as hex. The head script in layout.tsx
  * sets data-theme before paint: the stored choice, else the system's. Dark is the fallback.
@@ -393,5 +396,79 @@ body {
   }
   .tx .w {
     filter: none;
+  }
+}
+
+/* The landing's backdrop: two vines draw themselves down the screen edges, leaves fade in, and both sway. */
+.bgv-draw {
+  stroke-dasharray: 1800;
+  stroke-dashoffset: 1800;
+  animation: bgv-draw 3.5s cubic-bezier(0.3, 0.6, 0.2, 1) forwards;
+}
+@keyframes bgv-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.bgv-sway {
+  transform-box: view-box;
+  animation: bgv-sway 7s ease-in-out infinite;
+}
+.bgv-sway.l {
+  transform-origin: 0 0;
+}
+.bgv-sway.r {
+  transform-origin: 100% 0;
+  animation-delay: -3.5s;
+}
+@keyframes bgv-sway {
+  0%,
+  100% {
+    transform: rotate(0);
+  }
+  50% {
+    transform: rotate(1.4deg);
+  }
+}
+.bgv-leaf {
+  opacity: 0;
+  animation: bgv-in 0.8s ease-out forwards;
+}
+@keyframes bgv-in {
+  to {
+    opacity: 1;
+  }
+}
+
+/* A chapter's Vana pops out where the vine from the last one lands. */
+.v-pop {
+  animation: v-pop 0.6s cubic-bezier(0.3, 0.7, 0.3, 1) both;
+}
+@keyframes v-pop {
+  0% {
+    transform: scale(0);
+  }
+  60% {
+    transform: scale(1.12);
+  }
+  80% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bgv-draw,
+  .bgv-sway,
+  .bgv-leaf,
+  .v-pop {
+    animation: none !important;
+  }
+  .bgv-draw {
+    stroke-dashoffset: 0;
+  }
+  .bgv-leaf {
+    opacity: 1;
   }
 }
