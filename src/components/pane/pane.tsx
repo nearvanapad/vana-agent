@@ -15,7 +15,7 @@ export const TABS: { id: Tab; label: string; icon: typeof ShieldCheck }[] = [
 
 type Mode = "inline" | "float" | "drawer";
 
-/** Where the open pane shows: inside the chat on wide screens, a window the user drags once detached, else a drawer. */
+/** Where the open pane shows: a column beside the chat on wide screens, a window the user drags once detached, else a drawer. */
 export function usePaneMode(): Mode | null {
   const pane = usePane();
   if (!pane.open) return null;
@@ -23,52 +23,47 @@ export function usePaneMode(): Mode | null {
   return pane.docked ? "inline" : "drawer";
 }
 
-function Body({ title, mode, grab }: { title: React.ReactNode; mode: Mode; grab?: (e: React.PointerEvent) => void }) {
+/** A swap the chat prepared, still waiting for the wallet. */
+function useWaitingSwap(): boolean {
   const pane = usePane();
+  return pane.items.some((i) => i.kind === "proposal" && i.status === "done" && i.proposal && Date.parse(i.proposal.expires_at) > Date.now());
+}
+
+function Body({ mode, grab, title }: { mode: Mode; grab?: (e: React.PointerEvent) => void; title?: (text: string) => React.ReactNode }) {
+  const pane = usePane();
+  const text = TABS.find((t) => t.id === pane.tab)?.label ?? "";
   return (
-    <div className="flex min-h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <header
         onPointerDown={grab}
         className={clsx(
-          "sticky top-0 z-10 flex items-center justify-between gap-2 border-b border-line bg-bg/95 px-3 py-2 backdrop-blur",
+          "flex h-15 shrink-0 items-center justify-between gap-2 border-b border-line pr-2 pl-[clamp(12px,3vw,20px)]",
           grab && "cursor-grab touch-none select-none active:cursor-grabbing",
         )}
       >
-        {title}
-        {grab && <GripVertical size={14} className="-mr-1 shrink-0 text-text-2/60" aria-hidden />}
-        {/* Phones switch tools from the tab bar, so the header just names this one. */}
-        <span className="px-1 text-sm font-semibold md:hidden">{TABS.find((t) => t.id === pane.tab)?.label}</span>
-        <div role="tablist" className="flex gap-1 max-md:hidden">
-          {TABS.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              type="button"
-              role="tab"
-              aria-selected={pane.tab === id}
-              onClick={() => pane.dispatch({ t: "open", tab: id })}
-              className={clsx(
-                "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm",
-                pane.tab === id ? "bg-surface-2 text-text" : "text-text-2 hover:bg-surface-2/60 hover:text-text",
-              )}
-            >
-              <Icon size={14} /> {label}
-            </button>
-          ))}
-        </div>
-        <div className="ml-auto flex items-center">
+        <span className="flex min-w-0 items-center gap-1.5">
+          {grab && <GripVertical size={14} className="-ml-1 shrink-0 text-text-2/60" aria-hidden />}
+          {title ? title(text) : <span className="truncate font-display text-base tracking-[0.02em]">{text}</span>}
+        </span>
+        <div className="flex items-center gap-0.5">
           {pane.canFloat && (
             <button
               type="button"
               onClick={() => pane.setFloating(mode !== "float")}
-              className="rounded p-1.5 text-text-2 hover:bg-surface-2 hover:text-text"
+              className="grid size-8 place-items-center rounded-lg text-text-2 hover:bg-surface-2 hover:text-text"
               aria-label={mode === "float" ? "Dock the pane" : "Detach the pane"}
-              title={mode === "float" ? "Dock it back into the chat" : "Detach into a window you can drag"}
+              title={mode === "float" ? "Dock it back beside the chat" : "Detach into a window you can drag"}
             >
               {mode === "float" ? <PanelRight size={16} /> : <PictureInPicture2 size={16} />}
             </button>
           )}
-          <button type="button" onClick={() => pane.dispatch({ t: "close" })} className="rounded p-1.5 text-text-2 hover:bg-surface-2 hover:text-text" aria-label="Close the side pane">
-            <X size={18} />
+          <button
+            type="button"
+            onClick={() => pane.dispatch({ t: "close" })}
+            className="grid size-8 place-items-center rounded-lg text-text-2 hover:bg-surface-2 hover:text-text"
+            aria-label="Close the side pane"
+          >
+            <X size={17} />
           </button>
         </div>
       </header>
@@ -77,13 +72,39 @@ function Body({ title, mode, grab }: { title: React.ReactNode; mode: Mode; grab?
   );
 }
 
-/** The pane inside the chat, between the header and the chat box, beside the messages. */
-export function PaneInline() {
+/** The pane as a column beside the chat, full height, on wide screens. */
+export function PaneDocked() {
   if (usePaneMode() !== "inline") return null;
   return (
-    <aside className="mb-2 w-[440px] shrink-0 overflow-y-auto rounded-card border border-line bg-surface/30 2xl:w-[500px]" aria-label="Side pane">
-      <Body title={null} mode="inline" />
+    <aside className="flex h-dvh w-[440px] shrink-0 flex-col overflow-hidden border-l border-line bg-surface/30" aria-label="Side pane">
+      <Body mode="inline" />
     </aside>
+  );
+}
+
+/** The tools in the header, as one segmented switch: each opens the pane on it, or closes it. Phones use the tab bar. */
+export function PaneTabs() {
+  const pane = usePane();
+  const waiting = useWaitingSwap();
+  return (
+    <div role="tablist" aria-label="Tools" className="hidden gap-0.5 rounded-full border border-line bg-surface p-[3px] md:flex">
+      {TABS.map(({ id, label, icon: Icon }) => {
+        const on = pane.open && pane.tab === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={on}
+            onClick={() => pane.toggle(id)}
+            className={clsx("flex items-center gap-1.5 rounded-full px-3 py-[5px] text-[13px] whitespace-nowrap hover:text-text", on ? "bg-surface-2 text-text" : "text-text-2")}
+          >
+            <Icon size={14} /> {label}
+            {id === "swap" && waiting && !on && <span className="size-[7px] rounded-full bg-accent-deep" aria-label="A swap is waiting for your approval" />}
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -168,10 +189,10 @@ function Floating() {
       ref={ref}
       role="dialog"
       aria-label="Token checks and swaps"
-      className="fixed z-30 resize overflow-y-auto rounded-card border border-line bg-bg shadow-2xl shadow-void/60"
+      className="fixed z-30 resize overflow-hidden rounded-card border border-line bg-bg shadow-2xl shadow-void/60"
       style={{ left: box.x, top: box.y, width: box.w, height: box.h, minWidth: MIN_W, minHeight: MIN_H }}
     >
-      <Body title={null} mode="float" grab={grab} />
+      <Body mode="float" grab={grab} />
     </div>
   );
 }
@@ -189,14 +210,16 @@ export function PaneOverlay() {
         {/* Between the header and the tab bar, so both stay in view. */}
         <div className={clsx("fixed inset-x-0 top-15 z-40 bg-scrim", BOTTOM)} aria-hidden />
         <Dialog.Content
+          // Focus stays where the user pressed; Tab moves into the drawer.
+          onOpenAutoFocus={(e) => e.preventDefault()}
           onInteractOutside={(e) => {
             // The tab bar switches the drawer's tab itself.
             if ((e.detail.originalEvent.target as Element | null)?.closest("[data-tab-bar]")) e.preventDefault();
           }}
-          className={clsx("fixed right-0 top-15 z-50 w-full overflow-y-auto rounded-t-card border-x border-t border-line bg-bg sm:w-[480px]", BOTTOM)}
+          className={clsx("fixed right-0 top-15 z-50 w-full overflow-hidden border-l border-line bg-bg shadow-[-12px_0_32px_rgb(0_0_0/0.35)] sm:w-[440px]", BOTTOM)}
         >
           <Dialog.Description className="sr-only">Token checks and swaps</Dialog.Description>
-          <Body title={<Dialog.Title className="sr-only">Side pane</Dialog.Title>} mode="drawer" />
+          <Body mode="drawer" title={(text) => <Dialog.Title className="truncate font-display text-base tracking-[0.02em]">{text}</Dialog.Title>} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
@@ -228,31 +251,5 @@ export function PaneTabBar() {
         );
       })}
     </nav>
-  );
-}
-
-/** The buttons above the chat box that open the pane on a tool, or close it. Phones use the tab bar instead. */
-export function PaneToggles() {
-  const pane = usePane();
-  return (
-    <div className="mb-2 hidden gap-2 md:flex">
-      {TABS.map(({ id, label, icon: Icon }) => {
-        const on = pane.open && pane.tab === id;
-        return (
-          <button
-            key={id}
-            type="button"
-            onClick={() => pane.toggle(id)}
-            aria-pressed={on}
-            className={clsx(
-              "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs",
-              on ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line bg-bg text-text-2 hover:bg-surface-2 hover:text-text",
-            )}
-          >
-            <Icon size={13} /> {label}
-          </button>
-        );
-      })}
-    </div>
   );
 }

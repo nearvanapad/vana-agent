@@ -1,5 +1,6 @@
 "use client";
 
+import { clsx } from "clsx";
 import { BadgeCheck, ChevronDown, FlaskConical, Rocket } from "lucide-react";
 import { useState } from "react";
 import type { ReportView } from "@/lib/agent/tools";
@@ -97,6 +98,16 @@ export function verdict(checks: { level: Level; title: string }[]): string {
 
 const SHOWN = 6;
 
+/** The header's three counts. A count above zero takes its level's colour. */
+const TILES: { label: string; level: Level; tone: string }[] = [
+  { label: "Red flags", level: "red", tone: "text-bad" },
+  { label: "To watch", level: "yellow", tone: "text-warn" },
+  { label: "No flag", level: "green", tone: "text-ok" },
+];
+
+/** A check's level word, beside its title. */
+const WORD: Record<Level, string> = { red: "text-bad", yellow: "text-warn", green: "text-text-2", not_checked: "text-none" };
+
 function Wallets({ wallets, net }: { wallets: NonNullable<ReportView["checks"][number]["wallets"]>; net: string }) {
   const [all, setAll] = useState(false);
   const list = all ? wallets : wallets.slice(0, SHOWN);
@@ -104,7 +115,7 @@ function Wallets({ wallets, net }: { wallets: NonNullable<ReportView["checks"][n
     <div>
       <ul className="text-xs">
         {list.map((w) => (
-          <li key={w.account} className="border-t border-line/60 py-1.5">
+          <li key={w.account} className="border-t border-line py-1.5">
             <div className="flex items-baseline gap-2">
               <a
                 href={`${net}/address/${w.account}`}
@@ -137,11 +148,11 @@ export function RiskCard({ report }: { report: ReportView }) {
   const testnet = report.token.endsWith(".testnet");
   return (
     <section className="overflow-hidden rounded-card border border-line bg-surface" aria-label={`Risk report for ${report.token}`}>
-      <header className="space-y-2 border-b border-line px-4 py-3">
+      <header className="flex flex-col gap-2.5 border-b border-line px-4 py-3.5">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="font-mono text-base font-semibold">{report.symbol || "?"}</span>
+              <span className="font-mono text-[17px] font-semibold">{report.symbol || "?"}</span>
               {report.verified && (
                 <span className="inline-flex items-center gap-1 text-xs text-accent-deep" title="Rhea lists this token as verified">
                   <BadgeCheck size={13} /> verified
@@ -164,8 +175,18 @@ export function RiskCard({ report }: { report: ReportView }) {
           </div>
           <LevelPill level={report.level} />
         </div>
-        <p className="text-sm font-medium">{verdict(report.checks)}</p>
-        <p className="text-xs leading-snug text-text-2">
+        <div className="grid grid-cols-3 gap-2">
+          {TILES.map(({ label, level, tone }) => {
+            const n = report.checks.filter((c) => c.level === level).length;
+            return (
+              <div key={label} className="rounded-[10px] bg-surface-2 px-2.5 py-2">
+                <div className="text-[11px] text-text-2">{label}</div>
+                <div className={clsx("font-mono text-base font-semibold", n > 0 && tone)}>{n}</div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-xs leading-snug text-pretty text-text-2">
           {report.checks.length} fixed checks on public chain data, the same for every token, as of {time(report.as_of)}. They show patterns, not intent,
           and promise nothing.
         </p>
@@ -181,34 +202,34 @@ export function RiskCard({ report }: { report: ReportView }) {
                 type="button"
                 onClick={() => setOpen(isOpen ? null : c.id)}
                 aria-expanded={isOpen}
-                className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface-2/60"
+                className={clsx("flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-surface-2", isOpen && "bg-surface-2/50")}
               >
                 <Mark level={c.level} className="mt-0.5" />
                 <span className="min-w-0 flex-1">
                   <span className="flex flex-wrap items-center gap-x-2">
                     <span className="text-sm font-semibold">{c.title}</span>
-                    <span className="text-[0.65rem] font-semibold uppercase tracking-wider text-text-2">{LEVEL[c.level].word}</span>
+                    <span className={clsx("text-[10px] font-semibold tracking-[0.08em] uppercase", WORD[c.level])}>{LEVEL[c.level].word}</span>
                   </span>
                   <span className="block text-sm text-text-2">{c.summary}</span>
                 </span>
-                <ChevronDown size={16} className={`mt-1 shrink-0 text-text-2 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+                <ChevronDown size={16} className={clsx("mt-[3px] shrink-0 text-text-2 transition-transform duration-150", isOpen && "rotate-180")} />
               </button>
               {isOpen && (
-                <div className="space-y-3 px-4 pb-4 pl-12">
+                <div className="flex flex-col gap-3 bg-surface-2/50 px-4 pb-4 pl-12">
                   <p className="text-xs leading-snug text-text-2">{ABOUT[c.id]}</p>
                   {nums.length > 0 && (
-                    <dl className="grid grid-cols-[repeat(auto-fill,minmax(110px,1fr))] gap-x-4 gap-y-2">
+                    <dl className="grid grid-cols-[repeat(auto-fill,minmax(100px,1fr))] gap-2">
                       {nums.map(([label, value]) => (
-                        <div key={label} className="min-w-0">
-                          <dt className="text-[0.65rem] uppercase tracking-wider text-text-2">{label}</dt>
-                          <dd className="truncate font-mono text-sm font-semibold">{value}</dd>
+                        <div key={label} className="min-w-0 rounded-[10px] border border-line bg-surface px-2.5 py-2">
+                          <dt className="text-[10px] tracking-[0.08em] text-text-2 uppercase">{label}</dt>
+                          <dd className="truncate font-mono text-[13px] font-semibold">{value}</dd>
                         </div>
                       ))}
                     </dl>
                   )}
                   <ul className="space-y-1.5">
                     {c.findings.map((f, i) => (
-                      <li key={i} className="flex gap-2 text-sm">
+                      <li key={i} className="flex gap-2 text-[13px]">
                         <Dot level={f.level} className="mt-1.5" />
                         <span>{f.text}</span>
                       </li>

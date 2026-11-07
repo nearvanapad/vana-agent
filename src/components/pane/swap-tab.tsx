@@ -5,6 +5,7 @@ import { AlertTriangle, ArrowDownUp, Loader2, Wallet } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { networkOf, WALLET } from "@/lib/near/network";
 import { useSession } from "../session/use-session";
+import { EYEBROW, QUIET, STICKER } from "../ui/styles";
 import { QuoteCard, SwapCard } from "../chat/swap-card";
 import { usePane, type ProposalItem, type QuoteItem, type SwapForm } from "./pane-context";
 import { TokenPicker } from "./token-picker";
@@ -65,79 +66,111 @@ export function SwapTab() {
   const input = { from: form.from.trim(), to: form.to.trim(), amount: form.amount.trim(), slippage_pct: form.slippage };
   const signedIn = Boolean(session.account);
 
+  const waiting = focused?.kind === "proposal" && focused.status === "done";
+
   return (
-    <div className="space-y-3 px-4 py-3">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (ready) pane.quote(input);
-        }}
-        className="space-y-2 rounded-card border border-line bg-surface p-3"
-      >
-        <Field label="You pay" hint="Pick a token or paste a contract">
-          <div className="flex gap-2">
-            <input value={v("amount")} onChange={(e) => set({ amount: e.target.value.replace(/[^\d.]/g, "") })} inputMode="decimal" placeholder="0.0" aria-label="Amount" className={clsx(INPUT, "w-28 shrink-0")} />
-            <div className="min-w-0 flex-1">
+    <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto px-4 pt-3.5 pb-4">
+      {focused && (
+        <div className="flex flex-col gap-2">
+          <div className={clsx(EYEBROW, waiting ? "text-accent-deep" : "text-text-2")}>
+            {focused.kind === "quote" ? "Quote" : waiting ? "Waiting for your approval" : "Swap"}
+          </div>
+          <Result item={focused} />
+        </div>
+      )}
+
+      <div className="flex flex-col gap-2">
+        <div className={clsx(EYEBROW, "text-text-2")}>{focused ? "Or set up another swap" : "New swap"}</div>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (ready) pane.quote(input);
+          }}
+          className="flex flex-col gap-1.5 rounded-card border border-line bg-surface p-3"
+        >
+          <Field label="You pay" hint="Pick a token or paste a contract">
+            <input
+              value={v("amount")}
+              onChange={(e) => set({ amount: e.target.value.replace(/[^\d.]/g, "") })}
+              inputMode="decimal"
+              placeholder="0.0"
+              aria-label="Amount"
+              className="w-full min-w-0 flex-1 bg-transparent font-mono text-xl font-semibold placeholder:text-text-2/50 focus:outline-none"
+            />
+            <div className="w-[min(55%,200px)] shrink-0">
               <TokenPicker label="Pay with" value={v("from")} typing={Boolean(typed)} onChange={(from) => set({ from })} />
             </div>
+          </Field>
+          <div className="relative z-[1] -my-3.5 flex justify-center">
+            <button
+              type="button"
+              onClick={() => set({ from: form.to, to: form.from })}
+              aria-label="Swap sides"
+              className="grid size-8 place-items-center rounded-full border border-line bg-surface text-text-2 hover:bg-surface-2 hover:text-text"
+            >
+              <ArrowDownUp size={14} />
+            </button>
           </div>
-        </Field>
-        <div className="flex justify-center">
-          <button type="button" onClick={() => set({ from: form.to, to: form.from })} aria-label="Swap sides" className="rounded-full border border-line p-1.5 text-text-2 hover:bg-surface-2 hover:text-text">
-            <ArrowDownUp size={14} />
-          </button>
-        </div>
-        <Field label="You get" hint={WALLET.id === "testnet" ? "Testnet tokens, nearvana ones first" : "Tokens with a Rhea pool"}>
-          <TokenPicker label="Receive" value={v("to")} typing={Boolean(typed)} onChange={(to) => set({ to })} />
-        </Field>
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <span className="text-xs text-text-2">Max slippage</span>
-          <div className="flex gap-1">
-            {SLIPPAGE.map((p) => (
-              <button
-                key={p}
-                type="button"
-                onClick={() => set({ slippage: p })}
-                aria-pressed={form.slippage === p}
-                className={clsx("rounded-full border px-2.5 py-0.5 text-xs", form.slippage === p ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line text-text-2 hover:bg-surface-2")}
-              >
-                {p}%
-              </button>
-            ))}
+          <Field label="You get" hint={WALLET.id === "testnet" ? "Testnet tokens, nearvana ones first" : "Tokens with a Rhea pool"}>
+            <div className="min-w-0 flex-1">
+              <TokenPicker label="Receive" value={v("to")} typing={Boolean(typed)} onChange={(to) => set({ to })} />
+            </div>
+          </Field>
+          <div className="flex items-center justify-between gap-2 pt-2">
+            <span className="text-xs text-text-2">Max slippage</span>
+            <div className="flex gap-1">
+              {SLIPPAGE.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => set({ slippage: p })}
+                  aria-pressed={form.slippage === p}
+                  className={clsx(
+                    "rounded-full border px-2.5 py-0.5 text-xs",
+                    form.slippage === p ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line text-text-2 hover:bg-surface-2",
+                  )}
+                >
+                  {p}%
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-        {off && (
-          <p className="flex items-start gap-2 text-xs text-warn">
-            <AlertTriangle size={13} className="mt-0.5 shrink-0" /> Swaps run on NEAR {WALLET.id} here. {off} is a {networkOf(off).id} token: it can be checked, not swapped.
-          </p>
-        )}
-        {!off && WALLET.id === "testnet" && <p className="text-xs text-text-2">Testnet swap through Rhea&apos;s testnet pools, signed by your testnet wallet.</p>}
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <button type="submit" disabled={!ready || Boolean(off)} className="rounded-well border border-line px-3 py-2 text-sm hover:bg-surface-2 disabled:opacity-40">
-            Get quote
-          </button>
-          <button
-            type="button"
-            disabled={!ready || Boolean(off) || !signedIn}
-            onClick={() => pane.propose(input)}
-            title={signedIn ? "Checks the token bought, then shows the approval card" : "Sign in with your wallet to swap"}
-            className="flex items-center justify-center gap-1.5 rounded-well bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-40 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none"
-          >
-            <Wallet size={14} /> Review swap
-          </button>
-        </div>
-        {!signedIn && <p className="text-center text-xs text-text-2">Quotes work for anyone. To swap, connect your wallet and sign in at the top.</p>}
-      </form>
-
-      {focused && <Result item={focused} />}
+          {off && (
+            <p className="flex items-start gap-2 text-xs text-warn">
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" /> Swaps run on NEAR {WALLET.id} here. {off} is a {networkOf(off).id} token: it can be checked, not swapped.
+            </p>
+          )}
+          {!off && WALLET.id === "testnet" && <p className="text-xs text-text-2">Testnet swap through Rhea&apos;s testnet pools, signed by your testnet wallet.</p>}
+          <div className="grid grid-cols-2 gap-2 pt-1.5">
+            <button type="submit" disabled={!ready || Boolean(off)} className={clsx(QUIET, "rounded-well px-3 py-[9px] text-sm text-text")}>
+              Get quote
+            </button>
+            <button
+              type="button"
+              disabled={!ready || Boolean(off) || !signedIn}
+              onClick={() => pane.propose(input)}
+              title={signedIn ? "Checks the token bought, then shows the approval card" : "Sign in with your wallet to swap"}
+              className={clsx(STICKER, "rounded-well px-3 py-[9px] text-sm")}
+            >
+              <Wallet size={14} /> Review swap
+            </button>
+          </div>
+          {!signedIn && <p className="text-center text-xs text-text-2">Quotes work for anyone. To swap, connect your wallet and sign in under the chat list.</p>}
+        </form>
+      </div>
 
       {earlier.length > 0 && (
         <div className="space-y-1">
-          <p className="text-xs uppercase tracking-wider text-text-2">Earlier in this chat</p>
+          <p className={clsx(EYEBROW, "text-text-2")}>Earlier in this chat</p>
           {earlier.map((i) => {
             const q = i.kind === "quote" ? i.quote : i.proposal;
             return (
-              <button key={i.id} type="button" onClick={() => pane.dispatch({ t: "swapFocus", id: i.id })} className="block w-full truncate rounded-well px-2 py-1 text-left text-xs text-text-2 hover:bg-surface-2 hover:text-text">
+              <button
+                key={i.id}
+                type="button"
+                onClick={() => pane.dispatch({ t: "swapFocus", id: i.id })}
+                className="block w-full truncate rounded-well px-2 py-1 text-left text-xs text-text-2 hover:bg-surface-2 hover:text-text"
+              >
                 {i.kind === "quote" ? "Quote" : "Swap"}: {q ? `${q.from.amount} ${q.from.symbol} → ${q.to.amount} ${q.to.symbol}` : `${i.input.amount} ${i.input.from} → ${i.input.to}`}
               </button>
             );
@@ -148,16 +181,14 @@ export function SwapTab() {
   );
 }
 
-const INPUT = "rounded-well border border-line bg-bg px-3 py-2 font-mono text-sm placeholder:font-sans placeholder:text-text-2/70 focus:border-muted focus:outline-none";
-
 function Field({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
   return (
-    <div className="block space-y-1">
+    <div className="rounded-well border border-line bg-bg px-3 py-2.5">
       <span className="flex items-baseline justify-between gap-2 text-xs">
         <span className="text-text-2">{label}</span>
-        <span className="truncate text-text-2/70">{hint}</span>
+        <span className="truncate text-text-2/75">{hint}</span>
       </span>
-      {children}
+      <div className="mt-1 flex items-center gap-2">{children}</div>
     </div>
   );
 }

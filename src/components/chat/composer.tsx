@@ -2,6 +2,7 @@
 
 import { clsx } from "clsx";
 import { ArrowUp, Brain, Square } from "lucide-react";
+import { STICKER } from "@/components/ui/styles";
 import { useEffect, useRef, useState } from "react";
 
 export function Composer(props: {
@@ -47,13 +48,13 @@ export function Composer(props: {
             send();
           }
         }}
-        rows={1}
+        rows={2}
         maxLength={4000}
         placeholder="Ask about a NEAR token, e.g. “is SWEAT safe?”"
         aria-label="Message"
-        className="block max-h-[200px] w-full resize-none bg-transparent px-2 py-1.5 text-text placeholder:text-text-2/70 focus:outline-none"
+        className="block max-h-[200px] w-full resize-none bg-transparent px-2 py-1.5 text-[15px] text-text placeholder:text-text-2/70 focus:outline-none"
       />
-      <div className="mt-1 flex items-center justify-between">
+      <div className="mt-1 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => props.onThink(!props.think)}
@@ -66,20 +67,18 @@ export function Composer(props: {
         >
           <Brain size={13} /> Think
         </button>
-        {props.busy ? (
-          <button type="button" onClick={props.onStop} aria-label="Stop" className="rounded-full bg-surface-2 p-2 text-text hover:bg-line">
-            <Square size={16} fill="currentColor" />
-          </button>
-        ) : (
-          <button
-            type="submit"
-            disabled={!text.trim() || props.disabled}
-            aria-label="Send"
-            className="rounded-full bg-accent p-2 text-accent-ink hover:bg-accent-hi disabled:opacity-40 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none"
-          >
-            <ArrowUp size={16} />
-          </button>
-        )}
+        <div className="flex items-center gap-2.5">
+          <span className="hidden text-xs whitespace-nowrap text-text-2/80 lg:inline">Enter to send · Shift+Enter for a new line</span>
+          {props.busy ? (
+            <button type="button" onClick={props.onStop} aria-label="Stop" className="grid size-9 place-items-center rounded-full border border-line bg-surface-2 text-text hover:bg-line">
+              <Square size={14} fill="currentColor" />
+            </button>
+          ) : (
+            <button type="submit" disabled={!text.trim() || props.disabled} aria-label="Send" className={clsx(STICKER, "size-9 rounded-full")}>
+              <ArrowUp size={16} strokeWidth={2.4} />
+            </button>
+          )}
+        </div>
       </div>
     </form>
   );

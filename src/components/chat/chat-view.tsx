@@ -4,15 +4,14 @@ import { useChat } from "@ai-sdk/react";
 import { useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport, type UIMessage } from "ai";
 import { clsx } from "clsx";
-import { AlertTriangle, Loader2, RotateCcw } from "lucide-react";
-import Image from "next/image";
+import { AlertTriangle, RotateCcw } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { GateCard, useUnlocked } from "@/components/gate/gate-card";
 import { useChatSync } from "@/components/pane/chat-sync";
-import { PaneInline, PaneToggles, usePaneMode } from "@/components/pane/pane";
 import { usePane } from "@/components/pane/pane-context";
+import { EYEBROW } from "@/components/ui/styles";
+import { Mascot, type Mood } from "@/components/vana/mascot";
 import { Composer } from "./composer";
-import vana from "./vana.gif";
 import { Message } from "./message";
 
 /** Server errors arrive as the response body: show its `error` text when it is JSON. */
@@ -96,59 +95,51 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
     const el = scroller.current;
     if (el && pinned.current) el.scrollTop = el.scrollHeight;
   }, [messages, waiting]);
-  // With the pane inside the chat, the chat box runs under both.
-  const inline = usePaneMode() === "inline";
   // Until the wallet holds enough NVANA, the chat shows the way in instead.
   const locked = useUnlocked() === false;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1 gap-4 px-4">
-        <div ref={scroller} onScroll={onScroll} className="min-w-0 flex-1 overflow-y-auto">
-          <div className="mx-auto max-w-3xl space-y-6 py-6">
-            {locked ? (
-              <GateCard />
-            ) : messages.length === 0 ? (
-              <Empty account={account} onPick={send} disabled={!ready} />
-            ) : (
-              messages.map((m) => <Message key={m.id} message={m} />)
-            )}
-            {waiting && (
-              <div className="flex items-center gap-2 text-sm text-text-2" role="status">
-                <Loader2 size={14} className="animate-spin text-accent-deep" /> {think ? "Thinking…" : "Working…"}
-              </div>
-            )}
-            {stopped && !busy && !error && (
-              <p className="text-xs text-text-2" role="status">
-                Stopped. What was written so far is kept in this chat.
-              </p>
-            )}
-            {error && (
-              <div className="flex items-start justify-between gap-3 rounded-well border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad" role="alert">
-                <span className="flex items-start gap-2">
-                  <AlertTriangle size={15} className="mt-0.5 shrink-0" /> {errorText(error)}
-                </span>
-                <button type="button" onClick={() => void regenerate({ body: { think, pane: pane.snapshot() } })} className="flex shrink-0 items-center gap-1 hover:underline">
-                  <RotateCcw size={13} /> Retry
-                </button>
-              </div>
-            )}
-          </div>
+      <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto px-[clamp(12px,3vw,24px)]">
+        <div className="mx-auto flex max-w-[720px] flex-col gap-[clamp(16px,3vw,22px)] pt-[clamp(16px,4vw,28px)] pb-6">
+          {locked ? (
+            <GateCard />
+          ) : messages.length === 0 ? (
+            <Empty account={account} onPick={send} disabled={!ready} />
+          ) : (
+            messages.map((m) => <Message key={m.id} message={m} />)
+          )}
+          {waiting && (
+            <div className="flex items-center gap-3.5" role="status" aria-live="polite">
+              <Mascot mood="thinking" size={56} />
+              <span className="text-sm text-text-2">{think ? "Thinking it through…" : "Working…"}</span>
+            </div>
+          )}
+          {stopped && !busy && !error && (
+            <p className="text-xs text-text-2" role="status">
+              Stopped. What was written so far is kept in this chat.
+            </p>
+          )}
+          {error && (
+            <div className="flex items-start justify-between gap-3 rounded-well border border-bad/40 bg-bad/10 px-3 py-2 text-sm text-bad" role="alert">
+              <span className="flex items-start gap-2">
+                <AlertTriangle size={15} className="mt-0.5 shrink-0" /> {errorText(error)}
+              </span>
+              <button type="button" onClick={() => void regenerate({ body: { think, pane: pane.snapshot() } })} className="flex shrink-0 items-center gap-1 hover:underline">
+                <RotateCcw size={13} /> Retry
+              </button>
+            </div>
+          )}
         </div>
-        <PaneInline />
       </div>
-      <div className="shrink-0 px-4 pb-3 pt-2 md:pb-4">
-        <div className={clsx("mx-auto", !inline && "max-w-3xl")}>
-          <PaneToggles />
+      <div className="shrink-0 px-[clamp(10px,3vw,24px)] pt-2 pb-[clamp(10px,2vw,14px)]">
+        <div className="mx-auto max-w-[720px]">
           <Composer busy={busy} disabled={!ready || locked} think={think} onThink={setThink} onSend={send}
             onStop={() => {
               setStopped(true);
               void stop();
             }}
           />
-          <p className="mt-2 text-center text-xs text-text-2/80">
-            Read-only checks from public chain data. Not financial advice. Your wallet signs, never the AI.
-          </p>
         </div>
       </div>
     </div>
@@ -156,30 +147,36 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
 }
 
 function Empty({ account, onPick, disabled }: { account: string | null; onPick: (t: string) => void; disabled: boolean }) {
-  const prompts = [
-    "Is SWEAT safe?",
-    `Is ${DEMO_TOKEN} safe?`,
-    "Find clean new tokens on nearvana",
-    account ? "What does my wallet hold?" : "Who is the dev behind xrpx.nearlytrade.near?",
+  const [mood, setMood] = useState<Mood>("idle");
+  const prompts: [kind: string, text: string][] = [
+    ["Check", "Is SWEAT safe?"],
+    ["Demo · red report", `Is ${DEMO_TOKEN} safe?`],
+    ["Screen", "Find clean new tokens on nearvana"],
+    account ? ["Wallet", "What does my wallet hold?"] : ["Dev", "Who is the dev behind xrpx.nearlytrade.near?"],
   ];
   return (
-    <div className="flex flex-col items-center gap-4 pt-[12vh] text-center">
-      <Image src={vana} alt="Vana" width={96} height={96} unoptimized preload className="size-24" />
-      <h2 className="font-display text-3xl">Is this NEAR token safe?</h2>
-      <p className="max-w-md text-text-2">
-        Ask about any NEP-141 token. VANA checks the contract, the holders, who bought first and whether they are the dev in disguise, the
-        liquidity, taxes and the creator&apos;s earlier launches, and cites every number.
+    <div className="flex flex-col items-center gap-4 pt-[7vh] text-center">
+      <Mascot mood={mood} size={96} track label="Vana" />
+      <h2 className="font-display text-[clamp(22px,4.5vw,32px)] leading-tight">Is this NEAR token safe?</h2>
+      <p className="max-w-[480px] text-[clamp(13.5px,calc(0.6vw+11.5px),15px)] text-pretty text-text-2">
+        Ask me about any NEP-141 token. I check the contract, the holders, who bought first and whether they are the dev in disguise, the liquidity,
+        taxes and the creator&apos;s earlier launches, and I cite every number.
       </p>
-      <div className="mt-2 grid w-full max-w-lg gap-2 sm:grid-cols-2">
-        {prompts.map((p) => (
+      <div className="mt-2.5 grid w-full max-w-[560px] grid-cols-[repeat(auto-fit,minmax(240px,1fr))] gap-2.5">
+        {prompts.map(([kind, text]) => (
           <button
-            key={p}
+            key={text}
             type="button"
             disabled={disabled}
-            onClick={() => onPick(p)}
-            className="rounded-well border border-line bg-surface px-3 py-2 text-left text-sm hover:border-muted hover:bg-surface-2 disabled:opacity-50"
+            onClick={() => onPick(text)}
+            onPointerEnter={() => setMood("happy")}
+            onPointerLeave={() => setMood("idle")}
+            onFocus={() => setMood("happy")}
+            onBlur={() => setMood("idle")}
+            className="flex flex-col gap-0.5 rounded-well border border-line bg-surface px-3.5 py-3 text-left hover:border-muted hover:bg-surface-2 disabled:opacity-50"
           >
-            {p}
+            <span className={clsx(EYEBROW, "text-accent-deep")}>{kind}</span>
+            <span className="text-sm [overflow-wrap:anywhere]">{text}</span>
           </button>
         ))}
       </div>

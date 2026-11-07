@@ -1,12 +1,19 @@
 "use client";
 
+import { clsx } from "clsx";
 import { BadgeCheck, LogOut, PenLine, Wallet } from "lucide-react";
 import { useEffect } from "react";
 import { useSession } from "@/components/session/use-session";
+import { EYEBROW, STICKER } from "@/components/ui/styles";
 import { useWallet } from "./wallet-provider";
 
-/** Connect the wallet, then sign in with it (NEP-413) so chats are kept under the account. */
-export function ConnectButton() {
+const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 0 });
+
+/**
+ * The wallet at the foot of the sidebar: connect it, sign in with it (NEP-413) so chats are kept
+ * under the account, and see whether its NVANA unlocks the chat.
+ */
+export function WalletPanel() {
   const { account, ready, connecting, error, connect, disconnect } = useWallet();
   const session = useSession();
   const signedIn = Boolean(account && session.account === account);
@@ -17,56 +24,70 @@ export function ConnectButton() {
     if (ready && session.account && session.account !== account) signOut();
   }, [ready, account, session.account, signOut]);
 
-  if (account) {
-    const signInError = session.signIn.error?.message;
+  if (!account) {
     return (
-      <div className="flex flex-col items-end gap-1">
-        <div className="flex items-center gap-2">
-          {!signedIn && (
-            <button
-              type="button"
-              onClick={() => session.signIn.mutate()}
-              disabled={session.signIn.isPending}
-              className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-60 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none"
-              title="Sign a message (no transaction) to keep your chats under this account"
-            >
-              <PenLine size={14} />
-              {session.signIn.isPending ? "Check wallet…" : "Sign in"}
-            </button>
-          )}
-          <span
-            className="flex max-w-44 items-center gap-1.5 truncate rounded-full border border-line bg-surface px-3 py-1.5 font-mono text-sm"
-            title={signedIn ? `Signed in as ${account}` : account}
-          >
-            {signedIn && <BadgeCheck size={14} className="shrink-0 text-accent-deep" />}
-            <span className="truncate">{account}</span>
-          </span>
-          <button
-            type="button"
-            onClick={() => void disconnect()}
-            className="rounded-full border border-line p-2 text-text-2 hover:bg-surface-2"
-            aria-label="Disconnect wallet"
-          >
-            <LogOut size={16} />
-          </button>
-        </div>
-        {signInError && !/reject|cancel|closed/i.test(signInError) && <span className="text-xs text-bad">{signInError}</span>}
+      <div className="flex flex-col gap-2.5">
+        <p className="text-xs text-pretty text-text-2">Connect your wallet and sign in to chat. Your chats are kept under your wallet account.</p>
+        <button type="button" onClick={() => void connect()} disabled={!ready || connecting} className={clsx(STICKER, "gap-2 rounded-full px-3.5 py-2 text-sm")}>
+          <Wallet size={16} />
+          {connecting ? "Connecting…" : "Connect wallet"}
+        </button>
+        {error && <span className="text-xs text-bad">{error}</span>}
       </div>
     );
   }
 
+  const signInError = session.signIn.error?.message;
+  const a = signedIn ? session.access : null;
   return (
-    <div className="flex flex-col items-end gap-1">
-      <button
-        type="button"
-        onClick={() => void connect()}
-        disabled={!ready || connecting}
-        className="flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-60 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none"
-      >
-        <Wallet size={16} />
-        {connecting ? "Connecting…" : "Connect wallet"}
-      </button>
-      {error && <span className="text-xs text-bad">{error}</span>}
+    <div className="flex flex-col gap-2.5">
+      {a && (
+        <div className="flex items-center justify-between gap-2 rounded-well border border-line bg-surface px-3 py-2.5">
+          <div className="min-w-0">
+            <div className={clsx(EYEBROW, "font-normal text-text-2")}>Access</div>
+            <div className="truncate font-mono text-[13px] font-semibold">
+              {a.balance === null ? "—" : fmt(a.balance)} {a.symbol}
+            </div>
+          </div>
+          {a.ok ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ok/60 px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-ok">✓ Unlocked</span>
+          ) : (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-warn/60 px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-warn">
+              ! {a.reason === "unknown" ? "Unknown" : "Locked"}
+            </span>
+          )}
+        </div>
+      )}
+      {!signedIn && (
+        <button
+          type="button"
+          onClick={() => session.signIn.mutate()}
+          disabled={session.signIn.isPending}
+          title="Sign a message (no transaction) to keep your chats under this account"
+          className={clsx(STICKER, "gap-2 rounded-full px-3.5 py-2 text-sm")}
+        >
+          <PenLine size={15} />
+          {session.signIn.isPending ? "Check your wallet…" : "Sign in"}
+        </button>
+      )}
+      <div className="flex items-center gap-2">
+        <div
+          title={signedIn ? `Signed in as ${account}` : account}
+          className="flex min-w-0 flex-1 items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 font-mono text-[13px]"
+        >
+          {signedIn && <BadgeCheck size={14} className="shrink-0 text-accent-deep" />}
+          <span className="truncate">{account}</span>
+        </div>
+        <button
+          type="button"
+          onClick={() => void disconnect()}
+          aria-label="Disconnect wallet"
+          className="grid size-[34px] shrink-0 place-items-center rounded-full border border-line text-text-2 hover:bg-surface-2 hover:text-text"
+        >
+          <LogOut size={15} />
+        </button>
+      </div>
+      {signInError && !/reject|cancel|closed/i.test(signInError) && <span className="text-xs text-bad">{signInError}</span>}
     </div>
   );
 }

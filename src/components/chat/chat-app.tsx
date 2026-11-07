@@ -3,16 +3,21 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { UIMessage } from "ai";
-import { Loader2, Menu, X } from "lucide-react";
+import { clsx } from "clsx";
+import { Loader2, Menu, Plus, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { useSession } from "@/components/session/use-session";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
-import { ConnectButton } from "@/components/wallet/connect-button";
+import { useUnlocked } from "@/components/gate/gate-card";
+import { STICKER } from "@/components/ui/styles";
+import { WalletPanel } from "@/components/wallet/connect-button";
+import { WALLET } from "@/lib/near/network";
 import Image from "next/image";
 import { PaneProvider } from "@/components/pane/pane-context";
-import { PaneOverlay, PaneTabBar } from "@/components/pane/pane";
+import { PaneDocked, PaneOverlay, PaneTabBar, PaneTabs } from "@/components/pane/pane";
 import { ChatView } from "./chat-view";
 import { ConversationList, type ConversationItem } from "./conversation-list";
+import { Notice } from "./notice";
 import vana from "./vana.gif";
 
 /** The animated Vana mark next to the name. */
@@ -112,16 +117,29 @@ export function ChatApp() {
     },
   });
 
+  const conversations = list.data?.conversations ?? [];
   const sidebar = (
-    <ConversationList
-      items={list.data?.conversations ?? []}
-      active={active ?? ""}
-      onPick={(id) => (id === active ? setMenu(false) : open(id))}
-      onNew={startNew}
-      onDelete={(id) => remove.mutate(id)}
-      signedIn={Boolean(session.account)}
-    />
+    <>
+      <div className="px-3 pt-1 pb-3">
+        <button type="button" onClick={startNew} className={clsx(STICKER, "w-full gap-2 rounded-well px-3 py-[9px] text-sm")}>
+          <Plus size={16} strokeWidth={2.2} /> New chat
+        </button>
+      </div>
+      <ConversationList
+        items={conversations}
+        active={active ?? ""}
+        onPick={(id) => (id === active ? setMenu(false) : open(id))}
+        onDelete={(id) => remove.mutate(id)}
+        signedIn={Boolean(session.account)}
+      />
+      <div className="border-t border-line p-3">
+        <WalletPanel />
+      </div>
+    </>
   );
+
+  const locked = useUnlocked() === false;
+  const title = locked ? "Welcome" : (conversations.find((c) => c.id === active)?.title ?? "New chat");
 
   // Remember the URL of a new chat once its first message is sent.
   const onFirstSend = useCallback(() => {
@@ -132,11 +150,11 @@ export function ChatApp() {
 
   return (
     <PaneProvider key={active ?? "none"} conversationId={active}>
-      <div className="flex h-dvh overflow-hidden">
-        <aside className="hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-surface/40 p-3 md:flex">
-          <h1 className="mb-4 flex items-center gap-2 px-1 pt-1 font-display text-2xl tracking-wide text-accent-deep">
-            <Logo size={36} />
-            VANA
+      <div className="flex h-dvh overflow-hidden text-[clamp(14px,calc(0.4vw+12.5px),15px)]">
+        <aside className="hidden h-dvh w-66 shrink-0 flex-col border-r border-line bg-surface/40 md:flex">
+          <h1 className="flex h-15 shrink-0 items-center gap-2.5 pr-3 pl-4">
+            <Logo size={34} />
+            <span className="font-display text-[22px] tracking-[0.04em] text-accent-deep">VANA</span>
           </h1>
           {sidebar}
         </aside>
@@ -144,17 +162,17 @@ export function ChatApp() {
         <Dialog.Root open={menu} onOpenChange={setMenu}>
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 z-40 bg-scrim md:hidden" />
-            <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-line bg-bg p-3 md:hidden">
-              <div className="mb-4 flex items-center justify-between">
-                <Dialog.Title className="flex items-center gap-2 px-1 font-display text-2xl tracking-wide text-accent-deep">
-                  <Logo size={36} />
+            <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] flex-col border-r border-line bg-bg shadow-[12px_0_32px_rgb(0_0_0/0.35)] md:hidden">
+              <div className="flex h-15 shrink-0 items-center gap-2.5 pr-3 pl-4">
+                <Dialog.Title className="flex flex-1 items-center gap-2.5 font-display text-[22px] tracking-[0.04em] text-accent-deep">
+                  <Logo size={34} />
                   VANA
                 </Dialog.Title>
-                <Dialog.Close className="rounded p-1.5 text-text-2 hover:bg-surface-2" aria-label="Close menu">
+                <Dialog.Close className="grid size-10 place-items-center rounded-[10px] text-text-2 hover:bg-surface-2" aria-label="Close menu">
                   <X size={18} />
                 </Dialog.Close>
               </div>
-              <Dialog.Description className="sr-only">Your conversations</Dialog.Description>
+              <Dialog.Description className="sr-only">Your conversations and your wallet</Dialog.Description>
               {sidebar}
             </Dialog.Content>
           </Dialog.Portal>
@@ -162,19 +180,25 @@ export function ChatApp() {
 
         <main className="flex min-w-0 flex-1 flex-col">
           {/* 60px tall: the pane drawer opens just under it. */}
-          <header className="flex h-15 shrink-0 items-center justify-between gap-3 px-4">
-            <div className="flex items-center gap-2 md:invisible">
-              <button type="button" onClick={() => setMenu(true)} className="rounded p-1.5 text-text-2 hover:bg-surface-2 md:hidden" aria-label="Open menu">
+          <header className="flex h-15 shrink-0 items-center justify-between gap-3 border-b border-line px-[clamp(12px,3vw,20px)]">
+            <div className="flex min-w-0 items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setMenu(true)}
+                className="-ml-2 flex h-10 shrink-0 items-center gap-1.5 rounded-[10px] pr-2 pl-1.5 text-text-2 hover:bg-surface-2 md:hidden"
+                aria-label="Open menu: chats and wallet"
+              >
                 <Menu size={20} />
+                <Logo size={26} />
               </button>
-              <span className="flex items-center gap-1.5 font-display text-xl tracking-wide text-accent-deep md:hidden">
-                <Logo size={28} />
-                VANA
+              <span className="truncate text-[15px] font-medium" title={title}>
+                {title}
               </span>
+              <span className="shrink-0 rounded-full border border-line px-2 py-px text-[11px] text-text-2">{WALLET.id}</span>
             </div>
             <div className="flex items-center gap-2">
+              <PaneTabs />
               <ThemeToggle />
-              <ConnectButton />
             </div>
           </header>
 
@@ -194,7 +218,9 @@ export function ChatApp() {
           )}
           <PaneTabBar />
         </main>
+        <PaneDocked />
         <PaneOverlay />
+        <Notice />
       </div>
     </PaneProvider>
   );

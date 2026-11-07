@@ -2,11 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { AlertTriangle, ArrowDown, CheckCircle2, ExternalLink, Loader2, Undo2, Wallet, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Undo2, Wallet, XCircle } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { failedOnChain, sendTransactions, type WalletTx } from "@/lib/near/wallet";
 import type { Proposal, SwapQuote, SwapView } from "@/lib/swap/service";
 import { useSession } from "../session/use-session";
+import { STICKER } from "../ui/styles";
 import { useWallet } from "../wallet/wallet-provider";
 import { LevelPill } from "./level";
 import { shortAccount } from "./risk-card";
@@ -18,48 +19,51 @@ const usd = (n: number | null) => (n === null ? null : `$${n.toLocaleString("en-
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-1">
-      <span className="shrink-0 text-sm text-text-2">{label}</span>
-      <span className="min-w-0 text-right">{children}</span>
+    <div className="flex justify-between gap-3">
+      <dt className="shrink-0 text-text-2">{label}</dt>
+      <dd className="m-0 min-w-0 text-right">{children}</dd>
+    </div>
+  );
+}
+
+function Side({ label, amount, symbol, value }: { label: string; amount: string; symbol: string; value: number | null }) {
+  return (
+    <div className="rounded-well bg-surface-2 px-3 py-2.5">
+      <div className="text-xs text-text-2">{label}</div>
+      <div className="flex items-baseline justify-between gap-2">
+        <span className="min-w-0 truncate font-mono text-lg font-semibold">
+          {amount} {symbol}
+        </span>
+        {value !== null && <span className="shrink-0 text-xs text-text-2">{usd(value)}</span>}
+      </div>
     </div>
   );
 }
 
 function Amounts({ q, minOut }: { q: SwapQuote; minOut?: string | null }) {
   return (
-    <div className="px-4 py-3">
-      <Row label="You pay">
-        <span className="font-mono">
-          {q.from.amount} {q.from.symbol}
-        </span>
-        {q.from.usd !== null && <span className="ml-2 text-xs text-text-2">{usd(q.from.usd)}</span>}
-      </Row>
-      <div className="flex justify-center text-text-2">
-        <ArrowDown size={14} />
-      </div>
-      <Row label="You get about">
-        <span className="font-mono">
-          {q.to.amount} {q.to.symbol}
-        </span>
-        {q.to.usd !== null && <span className="ml-2 text-xs text-text-2">{usd(q.to.usd)}</span>}
-      </Row>
-      <Row label="At least">
-        <span className="font-mono text-sm">
-          {minOut ?? q.min_out} {q.to.symbol}
-        </span>
-        <span className="ml-2 text-xs text-text-2">{q.slippage_pct}% slippage</span>
-      </Row>
-      <Row label="To">
-        <span className="font-mono text-sm" title={q.recipient}>
-          {shortAccount(q.recipient)}
-          {q.to.chain !== "near" && <span className="ml-1 text-text-2">on {q.to.chain}</span>}
-        </span>
-      </Row>
-      <ul className="mt-2 space-y-0.5 text-xs text-text-2">
-        {q.fees.map((f) => (
-          <li key={f}>{f}</li>
-        ))}
-      </ul>
+    <div className="flex flex-col gap-1.5 px-4 py-3.5">
+      <Side label="You pay" amount={q.from.amount} symbol={q.from.symbol} value={q.from.usd} />
+      <Side label="You get about" amount={q.to.amount} symbol={q.to.symbol} value={q.to.usd} />
+      <dl className="mt-1.5 flex flex-col gap-1 text-[13px]">
+        <Row label="At least">
+          <span className="font-mono">
+            {minOut ?? q.min_out} {q.to.symbol}
+          </span>{" "}
+          <span className="text-xs text-text-2">{q.slippage_pct}% slippage</span>
+        </Row>
+        <Row label="To">
+          <span className="font-mono" title={q.recipient}>
+            {shortAccount(q.recipient)}
+            {q.to.chain !== "near" && <span className="ml-1 font-sans text-text-2">on {q.to.chain}</span>}
+          </span>
+        </Row>
+        {q.fees.length > 0 && (
+          <Row label="Fees">
+            <span className="text-text-2">{q.fees.join(" · ")}</span>
+          </Row>
+        )}
+      </dl>
     </div>
   );
 }
@@ -199,13 +203,19 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
           type="button"
           disabled={approve.isPending || (red && !ack)}
           onClick={() => approve.mutate()}
-          className="flex w-full items-center justify-center gap-2 rounded-well bg-accent px-4 py-2.5 font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-50 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none"
+          className={clsx(STICKER, "w-full gap-2 rounded-well px-4 py-[11px]")}
         >
           {approve.isPending ? <Loader2 size={16} className="animate-spin" /> : <Wallet size={16} />}
           {approve.isPending ? "Getting the final quote…" : "Approve in wallet"}
         </button>
         <p className="text-center text-xs text-text-2">
-          Your wallet shows the exact transaction before anything is sent.{countdown && ` Quote valid ${countdown}.`}
+          Your wallet shows the exact transaction before anything is sent.
+          {countdown && (
+            <>
+              {" "}
+              Quote valid <span className="font-mono text-text">{countdown}</span>.
+            </>
+          )}
         </p>
       </div>
     );
@@ -214,11 +224,14 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
   }
 
   return (
-    <section className="overflow-hidden rounded-card border border-line bg-surface" aria-label="Swap approval">
+    <section
+      className={clsx("overflow-hidden rounded-card border bg-surface", status === "proposed" && !expired ? "border-[color-mix(in_srgb,var(--accent-deep)_50%,var(--line))]" : "border-line")}
+      aria-label="Swap approval"
+    >
       <Header q={proposal} right={proposal.risk && <LevelPill level={proposal.risk.level} />} />
       <Amounts q={proposal} minOut={swap?.min_out} />
       {proposal.warnings.length > 0 && (
-        <ul className="mx-4 mb-3 space-y-1 rounded-well border border-warn/40 bg-warn/10 px-3 py-2 text-sm">
+        <ul className="mx-4 mb-3.5 space-y-1 rounded-well border border-warn/40 bg-warn/10 px-3 py-[9px] text-[13px]">
           {proposal.warnings.map((w) => (
             <li key={w} className={clsx("flex gap-2", w.includes(" is red") ? "text-bad" : "text-warn")}>
               <AlertTriangle size={14} className="mt-0.5 shrink-0" /> <span>{w}</span>
@@ -226,7 +239,7 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
           ))}
         </ul>
       )}
-      <div className="border-t border-line px-4 py-3">
+      <div className="border-t border-line px-4 py-3.5">
         {action}
         {approve.error && (
           <p className="mt-2 flex items-start gap-2 text-sm text-bad" role="alert">

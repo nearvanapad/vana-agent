@@ -139,7 +139,7 @@ let seq = 0;
 const newId = () => `pane-${Date.now().toString(36)}-${++seq}`;
 
 type Pane = State & {
-  /** Wide enough to show the pane inside the chat, next to the messages. */
+  /** Wide enough to show the pane as a column beside the chat. */
   docked: boolean;
   /** Wide enough for the pane to float as a window the user drags around. */
   canFloat: boolean;
@@ -175,7 +175,7 @@ export function usePane(): Pane {
 }
 
 export function PaneProvider({ conversationId, children }: { conversationId: string | null; children: ReactNode }) {
-  const docked = useMedia("(min-width: 1280px)");
+  const docked = useMedia("(min-width: 1180px)");
   const canFloat = useMedia("(min-width: 768px)");
   const [floating, setFloatingState] = useState(false);
   useEffect(() => setFloatingState(store.get<boolean>(FLOAT_KEY) ?? false), []);

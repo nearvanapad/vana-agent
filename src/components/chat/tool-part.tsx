@@ -7,7 +7,7 @@ import type { ReportView } from "@/lib/agent/tools";
 import type { Proposal, SwapQuote } from "@/lib/swap/service";
 import type { SourceRef } from "@/lib/sources/http";
 import type { ScreenResult } from "../pane/pane-context";
-import { ProposalChip, QuoteChip, ReportChip, ScreenChip, SearchChip } from "./chips";
+import { ProposalChip, QuoteChip, ReportChip, ReportProgress, ScreenChip, SearchChip } from "./chips";
 import { Sources } from "./sources";
 
 type Input = Record<string, unknown> | undefined;
@@ -80,6 +80,9 @@ export function ToolPart({ part }: { part: ToolPartLike }) {
   const name = part.type.replace(/^tool-/, "");
   const input = part.input as Input;
 
+  if ((part.state === "input-streaming" || part.state === "input-available") && name === "risk_report") {
+    return <ReportProgress token={String(input?.token ?? "the token")} done={[]} />;
+  }
   if (part.state === "input-streaming" || part.state === "input-available") {
     return (
       <div className="flex items-center gap-2 text-sm text-text-2" role="status">
@@ -100,11 +103,29 @@ export function ToolPart({ part }: { part: ToolPartLike }) {
   }
   if (part.state !== "output-available") return null;
 
-  // The full results live in the side pane; the chat links to them.
+  // The full results live in the side pane; the chat links to them, under a line saying what was done.
   const id = part.toolCallId;
-  if (name === "risk_report") return <ReportChip id={id} out={part.output as PendingReport | ReportView} />;
-  if (name === "quote_swap") return <QuoteChip id={id} out={part.output as SwapQuote} />;
-  if (name === "propose_swap") return <ProposalChip id={id} out={part.output as Proposal} />;
+  if (name === "risk_report") {
+    const out = part.output as PendingReport | ReportView;
+    if ("pending" in out) return <ReportChip id={id} out={out} />;
+    const sources = new Set(out.checks.flatMap((c) => c.sources.map((x) => x.url))).size;
+    return (
+      <>
+        <DoneLine>
+          Checked {out.token} · {out.checks.length} checks · {sources} source{sources === 1 ? "" : "s"}
+        </DoneLine>
+        <ReportChip id={id} out={out} />
+      </>
+    );
+  }
+  if (name === "quote_swap" || name === "propose_swap") {
+    return (
+      <>
+        <DoneLine>{toolLabel(name, input, true)}</DoneLine>
+        {name === "quote_swap" ? <QuoteChip id={id} out={part.output as SwapQuote} /> : <ProposalChip id={id} out={part.output as Proposal} />}
+      </>
+    );
+  }
   if (name === "find_tokens") return <ScreenChip id={id} out={part.output as ScreenResult} />;
   const chip = name === "search_token" ? <SearchChip id={id} out={part.output as { matches: TokenMatch[] }} query={String(input?.query ?? "")} /> : null;
 
@@ -113,7 +134,7 @@ export function ToolPart({ part }: { part: ToolPartLike }) {
       {chip}
       <details className="group text-sm text-text-2">
         <summary className="flex cursor-pointer list-none items-center gap-2 hover:text-text">
-          <Check size={14} className="text-accent-deep" />
+          <Check size={14} strokeWidth={2.5} className="text-accent-deep" />
           {toolLabel(name, input, true)}
         </summary>
         <div className="mt-2 pl-6">
@@ -121,5 +142,14 @@ export function ToolPart({ part }: { part: ToolPartLike }) {
         </div>
       </details>
     </>
+  );
+}
+
+function DoneLine({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 text-[13px] text-text-2">
+      <Check size={14} strokeWidth={2.5} className="shrink-0 text-accent-deep" />
+      <span className="min-w-0 truncate">{children}</span>
+    </div>
   );
 }

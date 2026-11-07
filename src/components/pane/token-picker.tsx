@@ -96,7 +96,7 @@ export function TokenPicker({ value, onChange, label, typing }: { value: string;
         <button
           type="button"
           aria-label={label}
-          className="flex w-full min-w-0 items-center gap-2 rounded-well border border-line bg-bg px-2.5 py-1.5 text-left hover:border-muted focus:border-muted focus:outline-none"
+          className="flex w-full min-w-0 items-center gap-2 rounded-full border border-line bg-surface-2 py-1 pr-2.5 pl-1.5 text-left hover:border-muted focus:border-muted focus:outline-none"
         >
           {typing || (!symbol && v) ? (
             <span className="min-w-0 flex-1 truncate py-0.5 font-mono text-sm">{v || " "}</span>

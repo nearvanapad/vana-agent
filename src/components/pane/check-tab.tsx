@@ -4,6 +4,7 @@ import { clsx } from "clsx";
 import { AlertTriangle, ArrowLeftRight, BadgeCheck, Columns3, Loader2, MessageSquare, RefreshCw, Rocket, Search, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { networkOf, WALLET } from "@/lib/near/network";
+import { QUIET, STICKER } from "../ui/styles";
 import { Dot, LevelPill, Mark } from "../chat/level";
 import { RiskCard, shortAccount } from "../chat/risk-card";
 import { GateCard, useUnlocked } from "../gate/gate-card";
@@ -49,61 +50,70 @@ export function CheckTab() {
   const doneReports = pane.reports.filter((r) => r.status === "done");
   const unlocked = useUnlocked();
 
-  if (unlocked === false) return <GateCard compact />;
+  if (unlocked === false)
+    return (
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <GateCard compact />
+      </div>
+    );
+
+  const report = focused?.kind === "report" && focused.report ? focused.report : null;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          pane.lookup(q);
-        }}
-        className="flex shrink-0 gap-2 px-4 pt-3"
-      >
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Symbol or contract, e.g. sweat or token.sweat"
-          aria-label="Token to check"
-          maxLength={80}
-          spellCheck={false}
-          autoCapitalize="none"
-          className="min-w-0 flex-1 rounded-well border border-line bg-surface px-3 py-2 font-mono text-sm placeholder:font-sans placeholder:text-text-2/70 focus:border-muted focus:outline-none"
-        />
-        <button type="submit" disabled={!q.trim()} className="flex items-center gap-1.5 rounded-well bg-accent px-3 py-2 text-sm font-medium text-accent-ink hover:bg-accent-hi disabled:opacity-40 border-2 border-edge shadow-sticker active:translate-x-(--sh) active:translate-y-(--sh) active:shadow-none disabled:shadow-none">
-          <Search size={14} /> Check
-        </button>
-      </form>
+      <div className="flex shrink-0 flex-col gap-3 px-4 pt-3.5">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            pane.lookup(q);
+          }}
+          className="flex gap-2"
+        >
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Symbol or contract, e.g. sweat or token.sweat"
+            aria-label="Token to check"
+            maxLength={80}
+            spellCheck={false}
+            autoCapitalize="none"
+            className="min-w-0 flex-1 rounded-well border border-line bg-surface px-3 py-2 font-mono text-[13px] placeholder:font-sans placeholder:text-text-2/70 focus:border-muted focus:outline-none"
+          />
+          <button type="submit" disabled={!q.trim()} className={clsx(STICKER, "rounded-well px-3.5 py-[7px] text-sm")}>
+            <Search size={14} strokeWidth={2.2} /> Check
+          </button>
+        </form>
 
-      {chips.length > 0 && (
-        <div className="flex shrink-0 gap-1.5 overflow-x-auto px-4 pt-3 pb-1 [scrollbar-width:thin]">
-          {doneReports.length >= 2 && (
-            <Chip active={pane.focus === "compare"} onClick={() => pane.dispatch({ t: "focus", id: "compare", compare: null })}>
-              <Columns3 size={12} /> Compare {doneReports.length}
-            </Chip>
-          )}
-          {chips.map((c) => (
-            <Chip key={c.id} active={pane.focus === c.id} onClick={() => pane.dispatch({ t: "focus", id: c.id })}>
-              {c.kind === "report" ? (
-                c.status === "running" ? (
-                  <Loader2 size={11} className="animate-spin" />
-                ) : c.report ? (
-                  <Dot level={c.report.level} />
+        {chips.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
+            {chips.map((c) => (
+              <Chip key={c.id} active={pane.focus === c.id} onClick={() => pane.dispatch({ t: "focus", id: c.id })}>
+                {c.kind === "report" ? (
+                  c.status === "running" ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : c.report ? (
+                    <Dot level={c.report.level} />
+                  ) : (
+                    <Dot level="not_checked" />
+                  )
+                ) : c.kind === "search" ? (
+                  <Search size={11} />
                 ) : (
-                  <Dot level="not_checked" />
-                )
-              ) : c.kind === "search" ? (
-                <Search size={11} />
-              ) : (
-                <Sparkles size={11} />
-              )}
-              <span className="max-w-[9rem] truncate">{label(c)}</span>
-            </Chip>
-          ))}
-        </div>
-      )}
+                  <Sparkles size={11} />
+                )}
+                <span className="max-w-[9rem] truncate">{label(c)}</span>
+              </Chip>
+            ))}
+            {doneReports.length >= 2 && (
+              <Chip active={pane.focus === "compare"} onClick={() => pane.dispatch({ t: "focus", id: "compare", compare: null })}>
+                <Columns3 size={12} /> Compare {doneReports.length}
+              </Chip>
+            )}
+          </div>
+        )}
+      </div>
 
-      <div className="flex-1 space-y-3 px-4 py-3">
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pt-3 pb-4">
         {pane.focus === "compare" ? (
           <Compare tokens={pane.compare} />
         ) : !focused ? (
@@ -116,6 +126,39 @@ export function CheckTab() {
           <ScreenBody item={focused} />
         ) : null}
       </div>
+
+      {report && pane.focus !== "compare" && (
+        <div className="grid shrink-0 grid-cols-[1fr_1fr_auto] gap-2 border-t border-line bg-bg px-4 py-3">
+          <button
+            type="button"
+            onClick={() => pane.ask(`Explain the report for \`${report.token}\``)}
+            className={clsx(QUIET, "rounded-well px-2.5 py-2 text-[13px] text-text", networkOf(report.token).id !== WALLET.id && "col-span-2")}
+          >
+            <MessageSquare size={14} /> Ask VANA about it
+          </button>
+          {networkOf(report.token).id === WALLET.id ? (
+            <button
+              type="button"
+              onClick={() => {
+                pane.dispatch({ t: "form", form: { to: report.token } });
+                pane.dispatch({ t: "open", tab: "swap" });
+              }}
+              className={clsx(STICKER, "min-w-0 rounded-well px-2.5 py-2 text-[13px]")}
+            >
+              <ArrowLeftRight size={14} /> <span className="truncate">Swap to {report.symbol || "it"}</span>
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => pane.check(report.token, { fresh: true })}
+            aria-label="Check again"
+            title="Check again"
+            className={clsx(QUIET, "w-[38px] rounded-well")}
+          >
+            <RefreshCw size={15} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -196,38 +239,7 @@ function ReportBody({ item }: { item: ReportItem }) {
   const pane = usePane();
   if (item.status === "error") return <Failed text={item.error ?? "The check failed."} retry={() => pane.check(item.token, { id: item.id })} />;
   if (!item.report) return <Progress item={item} />;
-  const r = item.report;
-  return (
-    <>
-      <RiskCard report={r} />
-      <div className="flex flex-wrap gap-2">
-        <Action onClick={() => pane.ask(`Explain the report for \`${r.token}\``)}>
-          <MessageSquare size={13} /> Ask VANA about it
-        </Action>
-        {networkOf(r.token).id === WALLET.id && (
-          <Action
-            onClick={() => {
-              pane.dispatch({ t: "form", form: { to: r.token } });
-              pane.dispatch({ t: "open", tab: "swap" });
-            }}
-          >
-            <ArrowLeftRight size={13} /> Swap to {r.symbol || "it"}
-          </Action>
-        )}
-        <Action onClick={() => pane.check(r.token, { fresh: true })}>
-          <RefreshCw size={13} /> Check again
-        </Action>
-      </div>
-    </>
-  );
-}
-
-function Action({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
-  return (
-    <button type="button" onClick={onClick} className="flex items-center gap-1.5 rounded-well border border-line px-3 py-1.5 text-xs text-text-2 hover:bg-surface-2 hover:text-text">
-      {children}
-    </button>
-  );
+  return <RiskCard report={item.report} />;
 }
 
 /** The checks as they land: each row waits with a spinner until its result is in. */

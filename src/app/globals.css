@@ -117,3 +117,221 @@ body {
   outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
+
+/*
+ * The Vana mascot (components/vana/mascot.tsx): an inline SVG whose parts move with CSS.
+ * Moods swap the face and the pace: idle, thinking, speaking, happy, alert.
+ */
+.vana {
+  --speed: 1;
+}
+.vana * {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.vana [transform] {
+  transform-box: view-box;
+  transform-origin: 0 0;
+}
+.vana .v-figure {
+  animation: v-bob calc(2.4s / var(--speed)) ease-in-out infinite;
+}
+.vana .v-note {
+  animation: v-float calc(2.4s / var(--speed)) ease-in-out infinite;
+}
+.vana .v-n2 {
+  animation-delay: -0.6s;
+}
+.vana .v-n3 {
+  animation-delay: -1.2s;
+}
+.vana .v-n4 {
+  animation-delay: -1.8s;
+}
+.vana .v-lotus {
+  transform-origin: 50% 100%;
+  animation: v-sway calc(2.4s / var(--speed)) ease-in-out infinite;
+}
+.vana .v-vine {
+  transform-origin: 0 0;
+  animation: v-vine calc(2.4s / var(--speed)) ease-in-out infinite;
+}
+.vana .v-eye {
+  animation: v-blink calc(4.8s / var(--speed)) infinite;
+}
+.vana .v-hair-cap {
+  animation: v-hair calc(2.4s / var(--speed)) steps(1) infinite;
+}
+.vana .v-locks path:nth-child(even) {
+  animation: v-locks calc(2.4s / var(--speed)) steps(1) infinite;
+}
+.vana .v-hair-shine {
+  stroke-dasharray: 22;
+  animation: v-shine calc(2.4s / var(--speed)) steps(6) infinite;
+}
+.vana .v-pupil {
+  transition: transform 0.25s ease-out;
+}
+.vana .v-nb {
+  transition: fill 0.3s;
+}
+.vana .v-spin {
+  transform-box: view-box;
+  transform-origin: 0 0;
+  animation: v-spin calc(14s / var(--speed)) linear infinite;
+}
+.vana .v-n2 .v-spin,
+.vana .v-n4 .v-spin {
+  animation-direction: reverse;
+  animation-duration: calc(18s / var(--speed));
+}
+.vana .v-eye-happy,
+.vana .v-brows,
+.vana .v-mouth-open,
+.vana .v-mouth-flat {
+  display: none;
+}
+
+.vana.mood-speaking .v-mouth-smile {
+  display: none;
+}
+.vana.mood-speaking .v-mouth-open {
+  display: inline;
+  animation: v-talk calc(0.34s / var(--speed)) ease-in-out infinite;
+}
+.vana.mood-speaking .v-figure {
+  animation-duration: calc(1.2s / var(--speed));
+}
+.vana.mood-thinking .v-mouth-smile {
+  display: none;
+}
+.vana.mood-thinking .v-mouth-flat {
+  display: inline;
+}
+.vana.mood-thinking .v-pupil {
+  transform: translate(-0.9px, -1.1px) !important;
+}
+.vana.mood-thinking .v-note {
+  animation-name: v-pulse;
+  animation-duration: calc(1.6s / var(--speed));
+}
+.vana.mood-happy .v-eye-open {
+  display: none;
+}
+.vana.mood-happy .v-eye-happy {
+  display: inline;
+}
+.vana.mood-happy .v-note {
+  animation-name: v-hop;
+  animation-duration: calc(0.8s / var(--speed));
+}
+.vana.mood-happy .v-lotus {
+  animation-duration: calc(1s / var(--speed));
+}
+.vana.mood-alert .v-mouth-smile {
+  display: none;
+}
+.vana.mood-alert .v-mouth-open {
+  display: inline;
+  transform: scale(0.7);
+}
+.vana.mood-alert .v-brows {
+  display: inline;
+}
+.vana.mood-alert .v-eye-open {
+  transform: scale(1.12);
+}
+.vana.mood-alert .v-figure {
+  animation: v-shake calc(0.5s / var(--speed)) linear infinite;
+}
+.vana.mood-alert .v-nb {
+  fill: #f2c66d;
+}
+
+@keyframes v-hair {
+  0% { fill: #2a5f42; }
+  13% { fill: #325f43; }
+  27% { fill: #2a5f42; }
+  40% { fill: #315240; }
+  53% { fill: #2a5f42; }
+  67% { fill: #325f43; }
+  80% { fill: #28523c; }
+  93% { fill: #325f43; }
+}
+@keyframes v-locks {
+  0% { stroke: #2c6245; }
+  13% { stroke: #316145; }
+  27% { stroke: #2c6245; }
+  40% { stroke: #345645; }
+  53% { stroke: #2c6245; }
+  67% { stroke: #316145; }
+  80% { stroke: #305841; }
+  93% { stroke: #316145; }
+}
+@keyframes v-shine {
+  0%, 100% { opacity: 1; stroke-dashoffset: 0; }
+  30% { opacity: 0.55; stroke-dashoffset: 2; }
+  55% { opacity: 0.9; stroke-dashoffset: -1; }
+  80% { opacity: 0.6; stroke-dashoffset: 1.5; }
+}
+@keyframes v-bob {
+  50% { transform: translateY(-0.8px); }
+}
+@keyframes v-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-1.6px); }
+}
+@keyframes v-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes v-sway {
+  0%, 100% { transform: rotate(-5deg); }
+  50% { transform: rotate(5deg); }
+}
+@keyframes v-vine {
+  0%, 100% { transform: skewX(0); }
+  50% { transform: skewX(-2deg); }
+}
+@keyframes v-blink {
+  0%, 90%, 100% { transform: scaleY(1); }
+  94% { transform: scaleY(0.08); }
+}
+@keyframes v-talk {
+  0%, 100% { transform: scaleY(1); }
+  50% { transform: scaleY(0.3); }
+}
+@keyframes v-hop {
+  0%, 100% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-3.5px) scale(1.15); }
+}
+@keyframes v-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-0.6px); }
+  75% { transform: translateX(0.6px); }
+}
+@keyframes v-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.85); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* The first-visit notice: the scrim fades, the card pops up. */
+@keyframes n-fade {
+  from { opacity: 0; }
+}
+@keyframes n-pop {
+  from { opacity: 0; transform: translateY(16px) scale(0.96); }
+}
+.n-fade {
+  animation: n-fade 0.25s ease-out;
+}
+.n-pop {
+  animation: n-pop 0.4s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vana *,
+  .n-fade,
+  .n-pop {
+    animation: none !important;
+  }
+}
