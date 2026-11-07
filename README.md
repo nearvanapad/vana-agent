@@ -16,6 +16,10 @@ Or `docker compose up --build`.
 
 Probe a contract: `pnpm probe <account>`. This prints the code hash, full-access keys and callable methods.
 
+## Deploy
+
+Live at https://vana.nearvana.trade. `deploy/ship.sh` builds HEAD for linux/amd64, pushes it to `ghcr.io/nearvanapad/vana-agent` and runs it on the server, rolling back if it doesn't come up healthy. `TAG=<sha> deploy/ship.sh` redeploys an older image. Secrets live in the server's `.env` (see `deploy/env.example`); public build values in `deploy/build.env`.
+
 ## Data sources
 
 NEAR RPC (FastNEAR), NearBlocks, FastNEAR API, Rhea (classic + DCL), NEAR Intents 1Click, nearly and justhoot launchpad contracts. Findings are in [docs/probes.md](docs/probes.md).
