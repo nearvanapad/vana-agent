@@ -5,13 +5,14 @@ import { WALLET } from "../near/network";
 import { onNetwork } from "../near/network-server";
 import { tryView, txStatus, viewAccount } from "../near/rpc";
 import { ftTransfer, ftTransferCall, nearDeposit, storageDeposit, type FunctionCallAction, type WalletTx } from "../near/tx";
-import { riskReport } from "../risk/report";
-import type { Level } from "../risk/types";
+import { access } from "../gate/access";
+import { storedReport } from "../risk/report";
 import { ref, type SourceRef } from "../sources/http";
 import * as oneclick from "../sources/oneclick";
 import { dcl, dclPoolUrl } from "../sources/rhea";
 import { fromRaw, resolveAsset, SwapError, toRaw, WNEAR, type Asset } from "./assets";
 import { bestRoute, quotePath, swapMsg } from "./rhea-route";
+import { swapRisk, type SwapRisk } from "./risk";
 
 /**
  * Swaps the agent can price and propose, and the user approves. The flow:
@@ -55,7 +56,10 @@ export type SwapQuote = {
 export type Proposal = SwapQuote & {
   id: string;
   account: string;
-  risk: { token: string; level: Level; summary: string } | null;
+  /** The last token check of the token bought, when there is one and the account may see checks. A swap never runs one. */
+  risk: SwapRisk | null;
+  /** The token bought is one a token check covers (a NEAR token other than NEAR itself). */
+  checkable?: boolean;
   warnings: string[];
   expires_at: string;
 };
@@ -235,8 +239,9 @@ async function ftBalance(token: string, account: string): Promise<bigint> {
 }
 
 /**
- * Prices the swap for the signed-in `account`, runs the risk check on what they'd buy, and stores
- * the proposal so approval uses exactly what the card showed.
+ * Prices the swap for the signed-in `account`, attaches the last token check of what they'd buy
+ * (for NVANA holders; it never runs one), and stores the proposal so approval uses exactly what
+ * the card showed.
  */
 export function proposeSwap(input: SwapInput, account: string, conversationId: string | null): Promise<Proposal> {
   // Swaps run on the wallet's network.
@@ -255,25 +260,22 @@ async function proposeSwapOn(input: SwapInput, account: string, conversationId: 
 
   const warnings: string[] = [];
   let risk: Proposal["risk"] = null;
-  if (r.to.chain === "near" && r.to.token && !r.to.native) {
-    const rep = await riskReport(r.to.token).catch(() => null);
-    if (rep) {
-      risk = { token: rep.token, level: rep.level, summary: rep.summary };
-      if (rep.level === "red") warnings.push(`The risk check on ${rep.token} is red: ${rep.summary}`);
-      const tax = rep.checks.find((c) => c.id === "taxes")?.numbers;
-      const buy = typeof tax?.buy_tax_pct === "number" ? tax.buy_tax_pct : null;
-      const sell = typeof tax?.sell_tax_pct === "number" ? tax.sell_tax_pct : null;
-      if (buy) warnings.push(`${q.to.symbol} takes a ${buy}% buy tax, so you receive about ${buy}% less than quoted.`);
-      if (sell) warnings.push(`Selling ${q.to.symbol} later costs a ${sell}% tax.`);
-    } else {
-      warnings.push(`The risk check on ${r.to.token} could not be run.`);
-    }
+  const checkable = r.to.chain === "near" && Boolean(r.to.token) && !r.to.native;
+  // Token checks are for NVANA holders, so a swap only shows one a holder could see anyway.
+  const rep = checkable && (await access(account)).ok ? storedReport(r.to.token!) : null;
+  if (rep) {
+    risk = swapRisk(rep);
+    const tax = rep.checks.find((c) => c.id === "taxes")?.numbers;
+    const buy = typeof tax?.buy_tax_pct === "number" ? tax.buy_tax_pct : null;
+    const sell = typeof tax?.sell_tax_pct === "number" ? tax.sell_tax_pct : null;
+    if (buy) warnings.push(`${q.to.symbol} takes a ${buy}% buy tax, so you receive about ${buy}% less than quoted.`);
+    if (sell) warnings.push(`Selling ${q.to.symbol} later costs a ${sell}% tax.`);
   }
   if (r.to.chain !== "near") warnings.push(`The output goes to ${q.recipient} on ${r.to.chain}. Check the address: a wrong one can't be undone.`);
 
   const id = `swp_${randomBytes(9).toString("base64url")}`;
   const now = Date.now();
-  const proposal: Proposal = { ...q, id, account, risk, warnings, expires_at: new Date(now + PROPOSAL_TTL_MS).toISOString() };
+  const proposal: Proposal = { ...q, id, account, risk, checkable, warnings, expires_at: new Date(now + PROPOSAL_TTL_MS).toISOString() };
   getDb()
     .prepare(
       `INSERT INTO swaps (id, account, conversation_id, route, status, proposal, created_at, updated_at)

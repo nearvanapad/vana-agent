@@ -5,11 +5,14 @@ import { clsx } from "clsx";
 import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Undo2, Wallet, XCircle } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { failedOnChain, sendTransactions, type WalletTx } from "@/lib/near/wallet";
+import { swapRisk, type SwapRisk } from "@/lib/swap/risk";
 import type { Proposal, SwapQuote, SwapView } from "@/lib/swap/service";
+import { useUnlocked } from "../gate/gate-card";
+import { usePane } from "../pane/pane-context";
 import { useSession } from "../session/use-session";
-import { STICKER } from "../ui/styles";
+import { QUIET, STICKER } from "../ui/styles";
 import { useWallet } from "../wallet/wallet-provider";
-import { LevelPill } from "./level";
+import { Dot, LevelPill } from "./level";
 import { shortAccount } from "./risk-card";
 import { Sources, time } from "./sources";
 
@@ -130,6 +133,7 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
   const mine = session.account === owner;
   const key = ["swap", proposal.id];
   const [ack, setAck] = useState(false);
+  const { risk, checking } = useSwapRisk(proposal);
 
   const live = useQuery({
     queryKey: key,
@@ -175,7 +179,7 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
     },
   });
 
-  const red = proposal.risk?.level === "red";
+  const red = risk?.level === "red";
   const countdown = useCountdown(proposal.expires_at, status === "proposed");
   const expired = status === "expired" || (status === "proposed" && Date.parse(proposal.expires_at) < Date.now());
 
@@ -228,12 +232,13 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
       className={clsx("overflow-hidden rounded-card border bg-surface", status === "proposed" && !expired ? "border-[color-mix(in_srgb,var(--accent-deep)_50%,var(--line))]" : "border-line")}
       aria-label="Swap approval"
     >
-      <Header q={proposal} right={proposal.risk && <LevelPill level={proposal.risk.level} />} />
+      <Header q={proposal} right={risk && <LevelPill level={risk.level} />} />
       <Amounts q={proposal} minOut={swap?.min_out} />
+      <RiskBox proposal={proposal} risk={risk} checking={checking} />
       {proposal.warnings.length > 0 && (
         <ul className="mx-4 mb-3.5 space-y-1 rounded-well border border-warn/40 bg-warn/10 px-3 py-[9px] text-[13px]">
           {proposal.warnings.map((w) => (
-            <li key={w} className={clsx("flex gap-2", w.includes(" is red") ? "text-bad" : "text-warn")}>
+            <li key={w} className="flex gap-2 text-warn">
               <AlertTriangle size={14} className="mt-0.5 shrink-0" /> <span>{w}</span>
             </li>
           ))}
@@ -253,6 +258,84 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
         <span className="text-xs text-text-2">Priced {time(proposal.as_of)}</span>
       </footer>
     </section>
+  );
+}
+
+/**
+ * The newest token check of the token bought: the one the proposal came with, or one run in the pane
+ * since. A swap never runs the checks; they stay behind the NVANA gate in the token checker.
+ */
+function useSwapRisk(proposal: Proposal): { risk: SwapRisk | null; checking: boolean } {
+  const pane = usePane();
+  const token = proposal.to.token;
+  const item = token ? pane.reports.find((r) => (r.report?.token ?? r.token) === token) : undefined;
+  const fromPane = item?.report ? swapRisk(item.report) : null;
+  // Proposals stored before flags were added carry only a level and a summary.
+  const own = proposal.risk && Array.isArray(proposal.risk.flags) ? proposal.risk : null;
+  const risk = [own, fromPane].filter((r): r is SwapRisk => r !== null).sort((a, b) => Date.parse(b.as_of) - Date.parse(a.as_of))[0] ?? null;
+  return { risk, checking: !risk && item?.status === "running" };
+}
+
+const ago = (iso: string) => {
+  const min = Math.round((Date.now() - Date.parse(iso)) / 60_000);
+  return min < 1 ? "just now" : min < 60 ? `${min} min ago` : `${Math.round(min / 60)} h ago`;
+};
+
+const TONE = { red: "border-bad/45 bg-bad/10", yellow: "border-warn/40 bg-warn/10", green: "border-line bg-surface-2", not_checked: "border-line bg-surface-2" } as const;
+
+/** What the token check found on the token bought, one bullet per flag; or how to get one. */
+function RiskBox({ proposal, risk, checking }: { proposal: Proposal; risk: SwapRisk | null; checking: boolean }) {
+  const pane = usePane();
+  const unlocked = useUnlocked();
+  const token = proposal.to.token;
+  const symbol = proposal.to.symbol;
+  if (!token || (!risk && !proposal.checkable)) return null;
+
+  if (risk) {
+    return (
+      <div className={clsx("mx-4 mb-3.5 rounded-well border px-3 py-2.5 text-[13px]", TONE[risk.level])}>
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="font-medium">Token check</span>
+          <span className="text-xs text-text-2">{ago(risk.as_of)}</span>
+        </div>
+        {risk.flags.length > 0 ? (
+          <ul className="mt-1.5 space-y-1.5">
+            {risk.flags.map((f) => (
+              <li key={f.title} className="flex gap-2">
+                <Dot level={f.level} className="mt-[5px]" />
+                <span className="text-pretty">
+                  <span className="font-medium">{f.title}:</span> <span className="text-text-2">{f.summary}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-1 text-text-2">No red flags or things to watch.</p>
+        )}
+        <button type="button" onClick={() => pane.check(token)} className="mt-2 text-xs font-medium text-accent-deep hover:underline">
+          Open full report
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-4 mb-3.5 flex flex-wrap items-center justify-between gap-2 rounded-well border border-line bg-surface-2 px-3 py-2.5 text-[13px] text-text-2">
+      {checking ? (
+        <span className="flex items-center gap-2">
+          <Loader2 size={14} className="animate-spin" /> Checking {symbol}…
+        </span>
+      ) : unlocked ? (
+        <>
+          <span>Not checked yet.</span>
+          <button type="button" onClick={() => pane.check(token)} className={clsx(QUIET, "rounded-full px-3 py-1 text-xs text-text")}>
+            Check {symbol}
+          </button>
+        </>
+      ) : (
+        <span>Not checked. Token checks are for NVANA holders.</span>
+      )}
+    </div>
   );
 }
 

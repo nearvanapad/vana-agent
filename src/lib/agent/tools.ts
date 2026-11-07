@@ -87,7 +87,7 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
 
     propose_swap: tool({
       description:
-        "Show the user a swap approval card for their wallet. Runs the risk check on the token bought and re-checks the balance. The user approves and signs in their wallet; you never sign. Only after the user clearly asked to swap these exact assets and amount.",
+        "Show the user a swap approval card for their wallet. Re-checks the balance and shows the last risk_report of the token bought, if there is one (it never runs one). The user approves and signs in their wallet; you never sign. Only after the user clearly asked to swap these exact assets and amount.",
       inputSchema: swapArgs,
       execute: async (args): Promise<Proposal> => {
         guard.assertAction("propose_swap");

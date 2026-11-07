@@ -157,6 +157,21 @@ export async function buildReport(token: string, opts: { quick?: boolean; onChec
   return report;
 }
 
+/** How long a token check stays good enough to show on a swap. */
+const STORED_TTL_MS = 24 * 60 * 60_000;
+
+/**
+ * The last full report on `input`, if the token was checked in the past day; never runs a check.
+ * The swap card shows it, so a swap doesn't run the checks the NVANA gate keeps for holders.
+ */
+export function storedReport(input: string): RiskReport | null {
+  const row = getDb().prepare("SELECT json, created_at FROM reports WHERE token = ?").get(normalizeToken(input)) as
+    | { json: string; created_at: number }
+    | undefined;
+  if (!row || Date.now() - row.created_at > STORED_TTL_MS) return null;
+  return { ...(JSON.parse(row.json) as RiskReport), cached: true };
+}
+
 /** The report for `input`, from the cache when fresh. `fresh` forces a new one. A full report also answers a quick one. */
 export async function riskReport(input: string, opts: ReportOpts = {}): Promise<RiskReport> {
   const token = normalizeToken(input);

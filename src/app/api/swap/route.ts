@@ -7,7 +7,7 @@ import { proposeSwap } from "@/lib/swap/service";
 
 /**
  * A swap the user filled in by hand in the side pane: the same approval card the chat makes,
- * with the risk check on the token bought. The user typed it, so no prompt-injection guard applies.
+ * with the last token check of the token bought, if any. The user typed it, so no prompt-injection guard applies.
  */
 
 const Body = z.object({
