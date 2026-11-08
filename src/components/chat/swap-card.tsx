@@ -175,7 +175,8 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
     mutationFn: async () => {
       const { swap: s, txs } = await post<{ swap: SwapView; txs: WalletTx[] }>(proposal.id, { action: "approve" });
       qc.setQueryData(key, s);
-      if (byDeposit) return;
+      // A deposit swap only signs when the account must first be registered on the token it receives.
+      if (byDeposit && !txs.length) return;
       let outcomes: Outcome[];
       try {
         outcomes = (await sendTransactions(txs)) as Outcome[];
@@ -204,7 +205,7 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
   let action: ReactNode;
   if (!mine) {
     action = <Note>This swap was prepared for {shortAccount(owner)}. Sign in with that wallet to approve it.</Note>;
-  } else if (!byDeposit && wallet.account !== owner) {
+  } else if ((!byDeposit || proposal.register) && wallet.account !== owner) {
     action = (
       <Note>
         Connect <span className="font-mono">{shortAccount(owner)}</span> in your wallet to approve.
@@ -228,11 +229,11 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
           className={clsx(STICKER, "w-full gap-2 rounded-well px-4 py-[11px]")}
         >
           {approve.isPending ? <Loader2 size={16} className="animate-spin" /> : byDeposit ? <Send size={16} /> : <Wallet size={16} />}
-          {approve.isPending ? "Getting the final quote…" : byDeposit ? "Approve and get the deposit address" : "Approve in wallet"}
+          {approve.isPending ? "Getting the final quote…" : byDeposit ? (proposal.register ? "Register, then get the deposit address" : "Approve and get the deposit address") : "Approve in wallet"}
         </button>
         <p className="text-center text-xs text-text-2">
           {byDeposit
-            ? `Next you send ${proposal.from.amount} ${proposal.from.symbol} on ${chainName(proposal.from.chain)} yourself. Nothing is sent before that.`
+            ? `${proposal.register ? `Your wallet first registers you on ${proposal.to.symbol} (about 0.00125 NEAR), so it can be delivered. ` : ""}Next you send ${proposal.from.amount} ${proposal.from.symbol} on ${chainName(proposal.from.chain)} yourself. Nothing is sent before that.`
             : "Your wallet shows the exact transaction before anything is sent."}
           {countdown && (
             <>

@@ -1,4 +1,4 @@
-import { getJson, memo, postJson, sourced, type Sourced } from "./http";
+import { getJson, HttpError, memo, postJson, sourced, type Sourced } from "./http";
 
 /**
  * NEAR Intents: cross-chain swaps settled by solvers, reached through one upstream picked on the
@@ -35,13 +35,32 @@ function shown(p: Provider, op: Op): string {
   return p === "aurora" ? `${AURORA_URL}/api/${op}` : `${ONECLICK_URL}/v0/${op}`;
 }
 
+/**
+ * Errors carry the URL they came from, and Aurora's has the key in it. Takes it out before an
+ * error can reach a log or a message.
+ */
+function hidingKey<T>(p: Provider, op: Op, run: Promise<T>): Promise<T> {
+  return run.catch((e: unknown) => {
+    const key = p === "aurora" ? process.env.AURORA_INTENTS_KEY?.trim() : undefined;
+    if (!key) throw e;
+    const clean = (text: string) => text.split(encodeURIComponent(key)).join("***").split(key).join("***");
+    if (e instanceof HttpError) throw new HttpError(clean(e.message), e.status, shown(p, op));
+    if (e instanceof Error) {
+      const out = new Error(clean(e.message));
+      out.name = e.name;
+      throw out;
+    }
+    throw e;
+  });
+}
+
 function headers(p: Provider): Record<string, string> {
   const jwt = process.env.ONECLICK_JWT;
   return p === "oneclick" && jwt ? { authorization: `Bearer ${jwt}` } : {};
 }
 
 /** Our fee on 1Click quotes, from the env. Aurora's is set per key in its portal instead. */
-function appFees(): { recipient: string; fee: number }[] | undefined {
+function readFees(): { recipient: string; fee: number }[] | undefined {
   const bps = process.env.INTENTS_FEE_BPS?.trim();
   const recipient = process.env.INTENTS_FEE_RECIPIENT?.trim();
   if (!bps && !recipient) return undefined;
@@ -50,6 +69,19 @@ function appFees(): { recipient: string; fee: number }[] | undefined {
   if (!Number.isInteger(fee) || fee < 0 || fee > 500) throw new Error("INTENTS_FEE_BPS must be a whole number from 0 to 500.");
   return fee === 0 ? undefined : [{ recipient, fee }];
 }
+
+/**
+ * Read once at start. A broken setting is logged loudly and quotes go out without our fee, so
+ * swaps keep working (and don't fall back to Rhea unseen) while it gets fixed.
+ */
+const APP_FEES = (() => {
+  try {
+    return readFees();
+  } catch (e) {
+    console.error(`[intents] Fee config ignored: ${(e as Error).message} Quotes carry no fee of ours until it's fixed.`);
+    return undefined;
+  }
+})();
 
 export type SwapAsset = {
   /** e.g. "nep141:wrap.near" */
@@ -67,7 +99,11 @@ type RawAsset = { assetId: string; symbol: string; blockchain: string; decimals:
 export const swapAssets = memo(10 * 60_000, async (): Promise<Sourced<SwapAsset[]>> => {
   const p = PROVIDER;
   // 1Click answers a bare list; Aurora wraps it as `{tokens, asset_stats}`.
-  const r = await getJson<RawAsset[] | { tokens: RawAsset[] }>(endpoint(p, "tokens"), { headers: headers(p), timeoutMs: 10_000, attempts: 2 });
+  const r = await hidingKey(
+    p,
+    "tokens",
+    getJson<RawAsset[] | { tokens: RawAsset[] }>(endpoint(p, "tokens"), { headers: headers(p), timeoutMs: 10_000, attempts: 2 }),
+  );
   const list = Array.isArray(r) ? r : r.tokens;
   return sourced(
     list.map((t) => ({
@@ -126,8 +162,8 @@ export type QuoteResponse = {
  */
 export async function quote(r: QuoteRequest): Promise<Sourced<QuoteResponse> & { provider: Provider }> {
   const p = PROVIDER;
-  const fees = p === "oneclick" ? appFees() : undefined;
-  const res = await postJson<QuoteResponse>(
+  const fees = p === "oneclick" ? APP_FEES : undefined;
+  const send = postJson<QuoteResponse>(
     endpoint(p, "quote"),
     {
       dry: r.dry,
@@ -148,6 +184,7 @@ export async function quote(r: QuoteRequest): Promise<Sourced<QuoteResponse> & {
     },
     { headers: headers(p), timeoutMs: 25_000 },
   );
+  const res = await hidingKey(p, "quote", send);
   return { ...sourced(res, PROVIDER_LABEL[p], shown(p, "quote")), provider: p };
 }
 
@@ -188,5 +225,5 @@ export type StatusResponse = {
 export async function status(p: Provider, depositAddress: string, depositMemo?: string | null): Promise<StatusResponse> {
   const q = new URLSearchParams({ depositAddress });
   if (depositMemo) q.set("depositMemo", depositMemo);
-  return getJson<StatusResponse>(`${endpoint(p, "status")}?${q}`, { headers: headers(p), timeoutMs: 15_000, attempts: 2 });
+  return hidingKey(p, "status", getJson<StatusResponse>(`${endpoint(p, "status")}?${q}`, { headers: headers(p), timeoutMs: 15_000, attempts: 2 }));
 }

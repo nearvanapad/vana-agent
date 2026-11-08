@@ -66,6 +66,11 @@ export type SwapQuote = {
 };
 
 export type Proposal = SwapQuote & {
+  /**
+   * A deposit swap into a NEAR token the account isn't registered on: approving asks the wallet to
+   * register it first, or the token couldn't be delivered.
+   */
+  register?: boolean;
   id: string;
   account: string;
   /** The last token check of the token bought, when there is one and the account may see checks. A swap never runs one. */
@@ -381,9 +386,21 @@ async function proposeSwapOn(input: SwapInput, account: string, conversationId: 
     );
   }
 
+  // A wallet swap registers the receiver in its own transactions; a deposit swap has none, so approval adds one.
+  const register = r.pay === "deposit" && r.to.chain === "near" && Boolean(r.to.token) && (await registration(r.to.token!, account)) !== null;
+
   const id = `swp_${randomBytes(9).toString("base64url")}`;
   const now = Date.now();
-  const proposal: Proposal = { ...q, id, account, risk, checkable, warnings, expires_at: new Date(now + PROPOSAL_TTL_MS).toISOString() };
+  const proposal: Proposal = {
+    ...q,
+    id,
+    account,
+    risk,
+    checkable,
+    register,
+    warnings,
+    expires_at: new Date(now + PROPOSAL_TTL_MS).toISOString(),
+  };
   getDb()
     .prepare(
       `INSERT INTO swaps (id, account, conversation_id, route, status, proposal, created_at, updated_at)
@@ -541,10 +558,12 @@ async function approveSwapOn(id: string, account: string): Promise<{ swap: SwapV
     }
     const kept = { ...qq, provider: q.provider, min_out: fromRaw(qq.minAmountOut, r.to.decimals) };
     if (r.pay === "deposit") {
-      // Nothing to sign: the user sends the deposit on the other chain, then the swap is tracked.
-      txs = [];
+      // The user sends the deposit on the other chain. The only thing to sign is registering the
+      // account on the token it receives, when it isn't yet: 1Click can't deliver to an unregistered one.
+      const reg = r.to.chain === "near" && r.to.token ? await registration(r.to.token, account) : null;
+      txs = reg ? [{ receiverId: r.to.token!, actions: [reg] }] : [];
       update(id, {
-        status: "awaiting_deposit",
+        status: reg ? "signing" : "awaiting_deposit",
         quote: JSON.stringify({ ...kept, amount_exact: fromRaw(qq.amountIn, r.from.decimals, r.from.decimals) }),
         deposit_address: qq.depositAddress,
       });
@@ -575,6 +594,11 @@ export function submitSwap(id: string, account: string, txHash: string | null): 
 async function submitSwapOn(id: string, account: string, txHash: string | null): Promise<SwapView> {
   const row = load(id, account);
   if (row.status !== "signing") throw new SwapError(`This swap is ${row.status}, not waiting for a signature.`);
+  // A deposit swap's signature was only the registration: now the user sends the deposit.
+  if (stored(row).proposal.pay === "deposit") {
+    update(id, { status: "awaiting_deposit" });
+    return view(load(id, account));
+  }
   update(id, { status: "submitted", tx_hash: txHash });
   // Some wallets don't return the hash; 1Click still finds the deposit by its address.
   if (txHash && row.route === "intents" && row.deposit_address) {
@@ -640,10 +664,12 @@ async function refreshSwapOn(id: string, account: string): Promise<SwapView> {
       const d = s.swapDetails;
       let status: SwapStatus =
         s.status === "SUCCESS" ? "success" : s.status === "REFUNDED" ? "refunded" : s.status === "FAILED" ? "failed" : "processing";
-      // Nothing has arrived at a deposit swap's address yet: keep waiting until well past its deadline.
-      if (s.status === "PENDING_DEPOSIT" && waiting) {
+      // Nothing has arrived at a deposit swap's address yet: keep waiting until well past its deadline,
+      // also when the user said they sent it.
+      if (s.status === "PENDING_DEPOSIT" && stored(row).proposal.pay === "deposit") {
         const deadline = Date.parse(storedQuote(row)?.deadline ?? "");
-        status = Number.isFinite(deadline) && Date.now() > deadline + DEPOSIT_GRACE_MS ? "expired" : "awaiting_deposit";
+        const over = Number.isFinite(deadline) && Date.now() > deadline + DEPOSIT_GRACE_MS;
+        status = over ? "expired" : waiting ? "awaiting_deposit" : "processing";
       }
       update(id, {
         status,

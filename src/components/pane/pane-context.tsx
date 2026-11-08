@@ -114,8 +114,12 @@ function reducer(s: State, a: Action): State {
       return { ...s, swapFocus: a.id, tab: "swap" };
     case "form": {
       const form = { ...s.form, ...a.form };
-      // A NEAR token picked from elsewhere (a report, the gate) lands in the Swap mode, paid from NEAR.
-      if (a.form.mode === "swap" && s.form.mode === "cross" && offNear(form.from)) form.from = "NEAR";
+      if (a.form.mode && a.form.mode !== s.form.mode && !a.form.other) {
+        // Changing mode from elsewhere (a report, the gate): keep the pair being left for when the user switches back.
+        form.other = { from: s.form.from, to: s.form.to };
+        // A NEAR token picked there lands in the Swap mode, paid from NEAR.
+        if (a.form.mode === "swap" && offNear(form.from)) form.from = "NEAR";
+      }
       return { ...s, form };
     }
     case "fillCheck":
