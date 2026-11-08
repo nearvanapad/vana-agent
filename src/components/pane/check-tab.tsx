@@ -260,11 +260,11 @@ function ReportBody({ item, web }: { item: ReportItem; web: boolean }) {
   const pane = usePane();
   if (item.status === "error") return <Failed text={item.error ?? "The check failed."} retry={() => pane.check(item.token, { id: item.id })} />;
   if (!item.report) return <Progress item={item} />;
+  // With Web Search on, any report shown here gets its web card on top. The chat itself never searches.
   return (
     <>
+      {web && <WebPanel token={item.report.token} />}
       <RiskCard report={item.report} />
-      {/* Only checks run here: reports the chat made never search the web. */}
-      {web && item.origin === "pane" && <WebPanel token={item.report.token} />}
     </>
   );
 }
