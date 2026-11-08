@@ -12,6 +12,7 @@ import { usePane } from "@/components/pane/pane-context";
 import { EYEBROW } from "@/components/ui/styles";
 import { Mascot, type Mood } from "@/components/vana/mascot";
 import { Composer } from "./composer";
+import { useTier } from "./use-tier";
 import { Message } from "./message";
 
 /** Server errors arrive as the response body: show its `error` text when it is JSON. */
@@ -32,6 +33,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
   const { id, initial, account, ready } = props;
   const qc = useQueryClient();
   const [think, setThink] = useState(false);
+  const { tiers, tier, setTier } = useTier();
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
@@ -54,7 +56,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
 
   const send = (text: string) => {
     setStopped(false);
-    void sendMessage({ text }, { body: { think, pane: pane.snapshot() } });
+    void sendMessage({ text }, { body: { think, tier, pane: pane.snapshot() } });
     props.onSend?.();
     // The conversation exists on the server once the request lands.
     setTimeout(() => void qc.invalidateQueries({ queryKey: ["conversations"] }), 800);
@@ -125,7 +127,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
               <span className="flex items-start gap-2">
                 <AlertTriangle size={15} className="mt-0.5 shrink-0" /> {errorText(error)}
               </span>
-              <button type="button" onClick={() => void regenerate({ body: { think, pane: pane.snapshot() } })} className="flex shrink-0 items-center gap-1 hover:underline">
+              <button type="button" onClick={() => void regenerate({ body: { think, tier, pane: pane.snapshot() } })} className="flex shrink-0 items-center gap-1 hover:underline">
                 <RotateCcw size={13} /> Retry
               </button>
             </div>
@@ -134,7 +136,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
       </div>
       <div className="shrink-0 px-[clamp(10px,3vw,24px)] pt-2 pb-[clamp(10px,2vw,14px)]">
         <div className="mx-auto max-w-[720px]">
-          <Composer busy={busy} disabled={!ready || locked} think={think} onThink={setThink} onSend={send}
+          <Composer busy={busy} disabled={!ready || locked} think={think} onThink={setThink} tiers={tiers} tier={tier} onTier={setTier} onSend={send}
             onStop={() => {
               setStopped(true);
               void stop();

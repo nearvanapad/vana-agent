@@ -1,15 +1,50 @@
 "use client";
 
 import { clsx } from "clsx";
-import { ArrowUp, Brain, Square } from "lucide-react";
+import { ArrowUp, Brain, ShieldCheck, Square } from "lucide-react";
+import type { Tier, TierInfo } from "@/lib/agent/model";
 import { STICKER } from "@/components/ui/styles";
 import { useEffect, useRef, useState } from "react";
+
+/** Which NEAR AI model tier answers: private (NEAR AI TEE), partner (partner TEE) or incognito (OpenAI/Anthropic). */
+function TierPicker({ tiers, tier, onTier, think }: { tiers: TierInfo[]; tier: Tier; onTier: (t: Tier) => void; think: boolean }) {
+  const cur = tiers.find((t) => t.id === tier) ?? tiers[0]!;
+  return (
+    <label
+      title={`NEAR AI model: ${cur.label}. ${cur.hint} (${think ? cur.think : cur.model})`}
+      className={clsx(
+        "relative flex min-w-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs focus-within:border-muted",
+        tier === "incognito" ? "border-line text-text-2 hover:bg-surface-2" : "border-ok/40 text-ok hover:bg-surface-2",
+      )}
+    >
+      <ShieldCheck size={13} className="shrink-0" />
+      <span className="hidden sm:inline">NEAR AI:</span>
+      <select
+        value={tier}
+        onChange={(e) => onTier(e.target.value as Tier)}
+        aria-label="NEAR AI model privacy"
+        className="min-w-0 cursor-pointer appearance-none bg-transparent pr-3 font-medium focus:outline-none"
+      >
+        {tiers.map((t) => (
+          <option key={t.id} value={t.id}>
+            {t.label}
+          </option>
+        ))}
+      </select>
+      <span aria-hidden className="pointer-events-none absolute right-2.5 text-[0.6rem]">▾</span>
+    </label>
+  );
+}
 
 export function Composer(props: {
   busy: boolean;
   disabled?: boolean;
   think: boolean;
   onThink: (v: boolean) => void;
+  /** NEAR AI Cloud model tiers, when the server offers them. */
+  tiers?: TierInfo[] | null;
+  tier?: Tier;
+  onTier?: (t: Tier) => void;
   onSend: (text: string) => void;
   onStop: () => void;
 }) {
@@ -55,18 +90,21 @@ export function Composer(props: {
         className="block max-h-[200px] w-full resize-none bg-transparent px-2 py-1.5 text-[15px] text-text placeholder:text-text-2/70 focus:outline-none"
       />
       <div className="mt-1 flex items-center justify-between gap-2">
-        <button
-          type="button"
-          onClick={() => props.onThink(!props.think)}
-          aria-pressed={props.think}
-          title="Think mode: slower, reasons more before answering"
-          className={clsx(
-            "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs",
-            props.think ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line text-text-2 hover:bg-surface-2",
-          )}
-        >
-          <Brain size={13} /> Think
-        </button>
+        <div className="flex min-w-0 items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => props.onThink(!props.think)}
+            aria-pressed={props.think}
+            title="Think mode: slower, reasons more before answering"
+            className={clsx(
+              "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs",
+              props.think ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line text-text-2 hover:bg-surface-2",
+            )}
+          >
+            <Brain size={13} /> Think
+          </button>
+          {props.tiers && props.tier && props.onTier && <TierPicker tiers={props.tiers} tier={props.tier} onTier={props.onTier} think={props.think} />}
+        </div>
         <div className="flex items-center gap-2.5">
           <span className="hidden text-xs whitespace-nowrap text-text-2/80 lg:inline">Enter to send · Shift+Enter for a new line</span>
           {props.busy ? (

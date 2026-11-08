@@ -10,7 +10,7 @@ import {
 } from "ai";
 import { z } from "zod";
 import { Guard } from "@/lib/agent/guard";
-import { chatModel, llmConfigured } from "@/lib/agent/model";
+import { chatModel, llmConfigured, TIER_IDS } from "@/lib/agent/model";
 import { instructions } from "@/lib/agent/prompt";
 import { buildTools } from "@/lib/agent/tools";
 import { ownerOf, readSession } from "@/lib/auth/session";
@@ -23,6 +23,8 @@ const Body = z.object({
   id: z.string().regex(CONVERSATION_ID),
   message: z.object({ id: z.string().max(64), role: z.literal("user"), parts: z.array(z.unknown()).min(1).max(20) }).passthrough(),
   think: z.boolean().optional(),
+  /** On NEAR AI Cloud: how private the model is. */
+  tier: z.enum(TIER_IDS as [string, ...string[]]).optional(),
   // What the side pane shows, so "this token" can be resolved. Ids only, never free text.
   pane: z
     .object({
@@ -51,7 +53,7 @@ export async function POST(req: Request) {
 
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) return Response.json({ error: "Bad request." }, { status: 400 });
-  const { id, think, pane } = body.data;
+  const { id, think, pane, tier } = body.data;
   const message = body.data.message as unknown as UIMessage;
   const text = titleFrom(message);
   if (JSON.stringify(message.parts).length > MAX_INPUT * 2 || text.length === 0) {
@@ -83,15 +85,16 @@ export async function POST(req: Request) {
 
   // A guest can price swaps but not propose one: proposals belong to a signed-in wallet.
   const names = (Object.keys(tools) as (keyof typeof tools)[]).filter((n) => s.account || n !== "propose_swap");
+  const llm = chatModel(Boolean(think), tier as Parameters<typeof chatModel>[1]);
   const result = streamText({
-    model: chatModel(Boolean(think)),
+    model: llm.model,
     instructions: instructions({ account: s.account, now: new Date(), canSwap: Boolean(s.account), pane }),
     messages: await convertToModelMessages(messages.slice(-HISTORY), { tools, ignoreIncompleteToolCalls: true }),
     tools,
     stopWhen: isStepCount(8),
     prepareStep: () => ({ activeTools: guard.active(names) }),
     // Normal mode answers from tool results and should be quick; Think mode takes its time.
-    reasoning: think ? "high" : "low",
+    ...(llm.reasoning ? { reasoning: llm.reasoning } : {}),
     abortSignal: req.signal,
     timeout: { totalMs: 240_000, toolMs: 60_000 },
     maxRetries: 1,

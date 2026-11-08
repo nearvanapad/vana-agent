@@ -18,6 +18,11 @@ Probe a contract: `pnpm probe <account>`. This prints the code hash, full-access
 
 Probe the swap upstreams: `pnpm probe:intents`. This prints what a user pays at each fee setting and checks every cross-chain pair.
 
+The chat runs on any OpenAI-compatible model. On NEAR AI Cloud (`LLM_BASE_URL=https://cloud-api.near.ai/v1`) the user picks how private it is:
+- **Private:** open models on NEAR AI's own TEE GPUs, verifiable.
+- **Partner:** larger open models in a partner's TEE.
+- **Incognito:** OpenAI or Anthropic models through NEAR AI's TEE gateway.
+
 Swaps reach NEAR Intents through one upstream, set by `INTENTS_PROVIDER`:
 - `oneclick` (the default): 1Click directly.
 - `aurora`: Aurora's Swap API, which fronts the same solvers.
