@@ -16,7 +16,7 @@ import { Dot, LevelPill } from "./level";
 import { shortAccount } from "./risk-card";
 import { Sources, time } from "./sources";
 
-const ROUTE_LABEL = { intents: "NEAR Intents", rhea: "Rhea pool" } as const;
+const routeLabel = (q: SwapQuote) => (q.route === "rhea" ? "Rhea pool" : q.provider === "aurora" ? "Aurora Intents" : "NEAR Intents");
 
 const usd = (n: number | null) => (n === null ? null : `$${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`);
 
@@ -76,7 +76,7 @@ function Header({ q, right }: { q: SwapQuote; right?: ReactNode }) {
     <header className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
       <div className="flex items-center gap-2">
         <span className="font-medium">Swap</span>
-        <span className="rounded-full border border-line px-2 py-0.5 text-xs text-text-2">via {ROUTE_LABEL[q.route]}</span>
+        <span className="rounded-full border border-line px-2 py-0.5 text-xs text-text-2">via {routeLabel(q)}</span>
       </div>
       {right}
     </header>

@@ -8,7 +8,7 @@ import { isNearly } from "../risk/launchpad/nearly";
 import { isNearvana } from "../risk/launchpad/nearvana";
 import type { LaunchpadName } from "../risk/types";
 import { mapLimit } from "../sources/http";
-import { swapAssets } from "../sources/oneclick";
+import { swapAssets } from "../sources/intents";
 import { allPools, prices, whitelist } from "../sources/rhea";
 
 /**

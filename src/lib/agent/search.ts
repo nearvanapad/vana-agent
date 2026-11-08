@@ -6,7 +6,7 @@ import * as nearvana from "../risk/launchpad/nearvana";
 import type { LaunchpadName } from "../risk/types";
 import { normalizeToken } from "../risk/report";
 import { ref, type SourceRef } from "../sources/http";
-import { swapAssets } from "../sources/oneclick";
+import { swapAssets } from "../sources/intents";
 import { poolCount, prices, whitelist } from "../sources/rhea";
 import { swapTokens } from "../swap/tokens";
 import { stranger } from "./guard";

@@ -1,6 +1,6 @@
 import { networkOf, WALLET } from "../near/network";
 import { tryView } from "../near/rpc";
-import { swapAssets, type SwapAsset } from "../sources/oneclick";
+import { swapAssets, type SwapAsset } from "../sources/intents";
 import { prices } from "../sources/rhea";
 import { stranger } from "../agent/guard";
 

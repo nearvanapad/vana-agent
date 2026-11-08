@@ -7,8 +7,8 @@ import { tryView, txStatus, viewAccount } from "../near/rpc";
 import { ftTransfer, ftTransferCall, nearDeposit, storageDeposit, type FunctionCallAction, type WalletTx } from "../near/tx";
 import { access } from "../gate/access";
 import { storedReport } from "../risk/report";
-import { ref, type SourceRef } from "../sources/http";
-import * as oneclick from "../sources/oneclick";
+import { HttpError, ref, type SourceRef } from "../sources/http";
+import * as intents from "../sources/intents";
 import { dcl, dclPoolUrl } from "../sources/rhea";
 import { fromRaw, resolveAsset, SwapError, toRaw, WNEAR, type Asset } from "./assets";
 import { bestRoute, quotePath, swapMsg } from "./rhea-route";
@@ -38,6 +38,8 @@ type Side = { symbol: string; asset: string; chain: string; token: string | null
 
 export type SwapQuote = {
   route: Route;
+  /** The intents upstream that priced it; null on the Rhea route. */
+  provider?: intents.Provider | null;
   from: Side;
   to: Side;
   /** The least the user receives, or the swap is refunded. */
@@ -133,7 +135,7 @@ async function resolve(input: SwapInput, account: string | null): Promise<Resolv
 }
 
 async function intentsQuote(r: Resolved, account: string | null, dry: boolean) {
-  return oneclick.quote({
+  return intents.quote({
     dry,
     originAsset: r.from.id,
     destinationAsset: r.to.id,
@@ -147,6 +149,9 @@ async function intentsQuote(r: Resolved, account: string | null, dry: boolean) {
 
 function intentsError(e: unknown): SwapError {
   const msg = e instanceof Error ? e.message : String(e);
+  const code = e instanceof HttpError ? e.status : null;
+  if (code === 429) return new SwapError("NEAR Intents is rate limiting quotes right now. Try again in a minute.");
+  if (code === 404 && intents.PROVIDER === "aurora") return new SwapError("The swap service isn't set up right (the Aurora API key isn't assigned).");
   if (/liquidity/i.test(msg)) return new SwapError("NEAR Intents has no solver quoting this pair and amount right now.");
   if (/amount.*(low|small)|too small|minimum/i.test(msg)) return new SwapError(`NEAR Intents says the amount is too small: ${msg}`);
   if (/recipient|address/i.test(msg)) return new SwapError(`NEAR Intents rejected the recipient: ${msg}`);
@@ -175,6 +180,7 @@ async function priced(r: Resolved, account: string | null): Promise<SwapQuote> {
       const fee = (q.data.quoteRequest.appFees ?? []).reduce((s, f) => s + f.fee, 0);
       return {
         route: "intents",
+        provider: q.provider,
         from: side(from, raw),
         to: side(to, BigInt(q.data.quote.amountOut)),
         min_out: fromRaw(q.data.quote.minAmountOut, to.decimals),
@@ -182,7 +188,7 @@ async function priced(r: Resolved, account: string | null): Promise<SwapQuote> {
         slippage_pct: bps / 100,
         recipient: r.recipient ?? account ?? "(your wallet)",
         fees: [
-          ...(fee ? [`NEAR Intents fee ${fee / 100}%, included in the quote.`] : []),
+          ...(fee ? [`${intents.PROVIDER_LABEL[q.provider]} fee ${fee / 100}%, included in the quote.`] : []),
           "Plus NEAR gas and, if needed, token registration (under 0.01 NEAR).",
         ],
         pool_ids: null,
@@ -208,6 +214,7 @@ async function priced(r: Resolved, account: string | null): Promise<SwapQuote> {
   const min = minus(route.amount_out, bps);
   return {
     route: "rhea",
+    provider: null,
     from: side(from, raw),
     to: side(to, route.amount_out),
     min_out: fromRaw(min, to.decimals),
@@ -308,6 +315,13 @@ function load(id: string, account: string): Row {
 
 const stored = (row: Row) => JSON.parse(row.proposal) as { proposal: Proposal; input: SwapInput };
 
+type StoredQuote = { provider?: intents.Provider; depositMemo?: string; min_out?: string };
+const storedQuote = (row: Row): StoredQuote | null => (row.quote ? (JSON.parse(row.quote) as StoredQuote) : null);
+
+/** The upstream that issued the swap's deposit address. Swaps from before providers were pinned used 1Click. */
+const providerOf = (row: Row): intents.Provider => storedQuote(row)?.provider ?? stored(row).proposal.provider ?? "oneclick";
+const depositMemoOf = (row: Row): string | null => storedQuote(row)?.depositMemo ?? null;
+
 function update(id: string, fields: Partial<Omit<Row, "id" | "account" | "route" | "proposal">>) {
   const keys = Object.keys(fields) as (keyof typeof fields)[];
   getDb()
@@ -404,7 +418,7 @@ async function approveSwapOn(id: string, account: string): Promise<{ swap: SwapV
     txs = await buildTxs(row, r, { depositAddress: qq.depositAddress });
     update(id, {
       status: "signing",
-      quote: JSON.stringify({ ...qq, min_out: fromRaw(qq.minAmountOut, r.to.decimals) }),
+      quote: JSON.stringify({ ...qq, provider: q.provider, min_out: fromRaw(qq.minAmountOut, r.to.decimals) }),
       deposit_address: qq.depositAddress,
     });
   } else {
@@ -432,7 +446,9 @@ async function submitSwapOn(id: string, account: string, txHash: string | null):
   if (row.status !== "signing") throw new SwapError(`This swap is ${row.status}, not waiting for a signature.`);
   update(id, { status: "submitted", tx_hash: txHash });
   // Some wallets don't return the hash; 1Click still finds the deposit by its address.
-  if (txHash && row.route === "intents" && row.deposit_address) await oneclick.submitDeposit(txHash, row.deposit_address);
+  if (txHash && row.route === "intents" && row.deposit_address) {
+    await intents.submitDeposit(providerOf(row), txHash, row.deposit_address, account);
+  }
   return refreshSwap(id, account);
 }
 
@@ -468,7 +484,7 @@ async function refreshSwapOn(id: string, account: string): Promise<SwapView> {
 
   try {
     if (row.route === "intents" && row.deposit_address) {
-      const s = await oneclick.status(row.deposit_address);
+      const s = await intents.status(providerOf(row), row.deposit_address, depositMemoOf(row));
       const d = s.swapDetails;
       const status: SwapStatus =
         s.status === "SUCCESS" ? "success" : s.status === "REFUNDED" ? "refunded" : s.status === "FAILED" ? "failed" : "processing";

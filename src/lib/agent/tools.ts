@@ -6,7 +6,7 @@ import { findTokens } from "../risk/screen";
 import { units } from "../risk/rules";
 import type { Check, RiskReport } from "../risk/types";
 import { ref, refOf } from "../sources/http";
-import { swapAssets } from "../sources/oneclick";
+import { swapAssets } from "../sources/intents";
 import { prices } from "../sources/rhea";
 import { proposeSwap, quoteSwap, type Proposal, type SwapQuote } from "../swap/service";
 import { stranger, type Guard } from "./guard";
