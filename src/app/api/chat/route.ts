@@ -11,6 +11,7 @@ import {
 import { z } from "zod";
 import { Guard } from "@/lib/agent/guard";
 import { chatModel, llmConfigured, TIER_IDS } from "@/lib/agent/model";
+import { capturingFetch, markPending, VERIFY, verifyReply, type Call } from "@/lib/agent/verify";
 import { instructions } from "@/lib/agent/prompt";
 import { buildTools } from "@/lib/agent/tools";
 import { ownerOf, readSession } from "@/lib/auth/session";
@@ -85,7 +86,13 @@ export async function POST(req: Request) {
 
   // A guest can price swaps but not propose one: proposals belong to a signed-in wallet.
   const names = (Object.keys(tools) as (keyof typeof tools)[]).filter((n) => s.account || n !== "propose_swap");
-  const llm = chatModel(Boolean(think), tier as Parameters<typeof chatModel>[1]);
+  // On NEAR AI every model call is captured byte for byte, to verify the reply once it's done.
+  // Private replies come back whole, so the model's own TEE signs them.
+  const calls: Call[] = [];
+  const pick = tier as Parameters<typeof chatModel>[1];
+  const whole = { current: false };
+  const llm = chatModel(Boolean(think), pick, VERIFY ? { fetch: capturingFetch(calls, () => whole.current) } : {});
+  whole.current = llm.tier === "private";
   const result = streamText({
     model: llm.model,
     instructions: instructions({ account: s.account, now: new Date(), canSwap: Boolean(s.account), pane }),
@@ -106,7 +113,14 @@ export async function POST(req: Request) {
       originalMessages: messages,
       generateMessageId: createIdGenerator({ prefix: "msg", size: 16 }),
       sendReasoning: true,
-      onEnd: ({ messages: all }) => saveMessages(id, all),
+      onEnd: ({ messages: all }) => {
+        saveMessages(id, all);
+        const last = all.at(-1);
+        if (VERIFY && last?.role === "assistant" && calls.length) {
+          markPending(id, last.id);
+          void verifyReply(id, last.id, calls, llm.tier);
+        }
+      },
       onError: (e) => {
         console.error("chat stream error", e);
         return friendly(e);

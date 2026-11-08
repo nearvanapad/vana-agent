@@ -109,7 +109,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
           ) : messages.length === 0 ? (
             <Empty account={account} onPick={send} disabled={!ready} />
           ) : (
-            messages.map((m) => <Message key={m.id} message={m} />)
+            messages.map((m, i) => <Message key={m.id} message={m} conversationId={id} done={!(busy && i === messages.length - 1)} latest={i === messages.length - 1} />)
           )}
           {waiting && (
             <div className="flex items-center gap-3.5" role="status" aria-live="polite">

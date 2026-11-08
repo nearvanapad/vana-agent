@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   // Self-contained server for the Docker image.
   output: "standalone",
   // Native module, loaded at runtime on the server only.
-  serverExternalPackages: ["better-sqlite3"],
+  serverExternalPackages: ["better-sqlite3", "@nearai/inference-sdk"],
   // The share image reads its fonts from disk.
   outputFileTracingIncludes: { "/**": ["src/lib/share/fonts/*.ttf"] },
   // Chats used to live at the root: send old links (/?c=<id>) to the app.

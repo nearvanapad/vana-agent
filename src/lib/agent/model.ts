@@ -96,10 +96,16 @@ function effort(id: string, think: boolean): "low" | "high" | undefined {
   return think ? "high" : "low";
 }
 
-/** The model for a reply, and the reasoning effort to ask for. */
-export function chatModel(think: boolean, pick?: Tier) {
+/**
+ * The model for a reply, its tier, and the reasoning effort to ask for. `fetch` replaces the
+ * transport (to capture the exact bytes for verification) on chat-completions endpoints.
+ */
+export function chatModel(think: boolean, pick?: Tier, opts: { fetch?: typeof globalThis.fetch } = {}) {
   const t = TIERS?.find((x) => x.id === (pick ?? DEFAULT_TIER));
   const id = t ? (think ? t.think : t.model) : think ? THINK_MODEL : MODEL;
-  const model = isOpenAI ? openai.responses(id) : compatible.chatModel(id);
-  return { id, model, reasoning: effort(id, think) };
+  const provider = opts.fetch
+    ? createOpenAICompatible({ name: "llm", baseURL: BASE_URL, apiKey: API_KEY, includeUsage: true, fetch: opts.fetch })
+    : compatible;
+  const model = isOpenAI ? openai.responses(id) : provider.chatModel(id);
+  return { id, tier: t?.id, model, reasoning: effort(id, think) };
 }

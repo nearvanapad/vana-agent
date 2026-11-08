@@ -23,6 +23,8 @@ The chat runs on any OpenAI-compatible model. On NEAR AI Cloud (`LLM_BASE_URL=ht
 - **Partner:** larger open models in a partner's TEE.
 - **Incognito:** OpenAI or Anthropic models through NEAR AI's TEE gateway.
 
+Every reply on NEAR AI is verified: the server checks NEAR AI's signature of each model call against the exact request and response, and the attestation of the hardware that signed it (via `@nearai/inference-sdk`). A badge under the reply says what was proven: "Verified · private" when the Private model's own TEE signed it, "Signed" when NEAR AI's TEE gateway did.
+
 Swaps reach NEAR Intents through one upstream, set by `INTENTS_PROVIDER`:
 - `oneclick` (the default): 1Click directly.
 - `aurora`: Aurora's Swap API, which fronts the same solvers.

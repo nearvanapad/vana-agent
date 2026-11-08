@@ -4,8 +4,10 @@ import type { UIMessage } from "ai";
 import { Brain } from "lucide-react";
 import { Md } from "./markdown";
 import { ToolPart, type ToolPartLike } from "./tool-part";
+import { VerifyBadge } from "./verify-badge";
 
-export function Message({ message }: { message: UIMessage }) {
+/** One chat message. `conversationId` and `done` show the verification badge under a finished reply. */
+export function Message({ message, conversationId, done, latest }: { message: UIMessage; conversationId?: string; done?: boolean; latest?: boolean }) {
   if (message.role === "user") {
     const text = message.parts.map((p) => (p.type === "text" ? p.text : "")).join("\n");
     return (
@@ -34,6 +36,7 @@ export function Message({ message }: { message: UIMessage }) {
         if (p.type.startsWith("tool-")) return <ToolPart key={key} part={p as unknown as ToolPartLike} />;
         return null;
       })}
+      {done && conversationId && <VerifyBadge conversationId={conversationId} messageId={message.id} latest={latest} />}
     </div>
   );
 }
