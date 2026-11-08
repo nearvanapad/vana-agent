@@ -2,9 +2,10 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { AlertTriangle, CheckCircle2, ExternalLink, Loader2, Undo2, Wallet, XCircle } from "lucide-react";
+import { AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, Loader2, Send, Undo2, Wallet, XCircle } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { failedOnChain, sendTransactions, type WalletTx } from "@/lib/near/wallet";
+import { chainName } from "@/lib/swap/chains";
 import { swapRisk, type SwapRisk } from "@/lib/swap/risk";
 import type { Proposal, SwapQuote, SwapView } from "@/lib/swap/service";
 import { useUnlocked } from "../gate/gate-card";
@@ -46,7 +47,7 @@ function Side({ label, amount, symbol, value }: { label: string; amount: string;
 function Amounts({ q, minOut }: { q: SwapQuote; minOut?: string | null }) {
   return (
     <div className="flex flex-col gap-1.5 px-4 py-3.5">
-      <Side label="You pay" amount={q.from.amount} symbol={q.from.symbol} value={q.from.usd} />
+      <Side label={q.from.chain === "near" ? "You pay" : `You send on ${chainName(q.from.chain)}`} amount={q.from.amount} symbol={q.from.symbol} value={q.from.usd} />
       <Side label="You get about" amount={q.to.amount} symbol={q.to.symbol} value={q.to.usd} />
       <dl className="mt-1.5 flex flex-col gap-1 text-[13px]">
         <Row label="At least">
@@ -58,9 +59,17 @@ function Amounts({ q, minOut }: { q: SwapQuote; minOut?: string | null }) {
         <Row label="To">
           <span className="font-mono" title={q.recipient}>
             {shortAccount(q.recipient)}
-            {q.to.chain !== "near" && <span className="ml-1 font-sans text-text-2">on {q.to.chain}</span>}
+            {q.to.chain !== "near" && <span className="ml-1 font-sans text-text-2">on {chainName(q.to.chain)}</span>}
           </span>
         </Row>
+        {q.refund_to && (
+          <Row label="Refund to">
+            <span className="font-mono" title={q.refund_to}>
+              {shortAccount(q.refund_to)}
+              <span className="ml-1 font-sans text-text-2">on {chainName(q.from.chain)}</span>
+            </span>
+          </Row>
+        )}
         {q.fees.length > 0 && (
           <Row label="Fees">
             <span className="text-text-2">{q.fees.join(" · ")}</span>
@@ -117,8 +126,11 @@ function useCountdown(until: string, active: boolean): string | null {
     return () => clearInterval(t);
   }, [active]);
   const left = Math.max(0, Date.parse(until) - now);
-  if (!active) return null;
-  return `${Math.floor(left / 60_000)}:${String(Math.floor(left / 1000) % 60).padStart(2, "0")}`;
+  if (!active || !Number.isFinite(left)) return null;
+  const h = Math.floor(left / 3_600_000);
+  const m = Math.floor(left / 60_000) % 60;
+  const sec = String(Math.floor(left / 1000) % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
 
 /**
@@ -132,6 +144,8 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
   const owner = proposal.account;
   const mine = session.account === owner;
   const key = ["swap", proposal.id];
+  // Paid on another chain: approving gives a deposit address instead of a wallet prompt.
+  const byDeposit = proposal.pay === "deposit";
   const [ack, setAck] = useState(false);
   const { risk, checking } = useSwapRisk(proposal);
 
@@ -144,7 +158,10 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
       return j;
     },
     enabled: mine,
-    refetchInterval: (q) => (q.state.data && ["submitted", "processing"].includes(q.state.data.status) ? 4000 : false),
+    refetchInterval: (q) => {
+      const st = q.state.data?.status;
+      return st === "awaiting_deposit" ? 8000 : st === "submitted" || st === "processing" ? 4000 : false;
+    },
   });
   const swap = live.data;
   const status = swap?.status ?? "proposed";
@@ -158,6 +175,7 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
     mutationFn: async () => {
       const { swap: s, txs } = await post<{ swap: SwapView; txs: WalletTx[] }>(proposal.id, { action: "approve" });
       qc.setQueryData(key, s);
+      if (byDeposit) return;
       let outcomes: Outcome[];
       try {
         outcomes = (await sendTransactions(txs)) as Outcome[];
@@ -186,7 +204,7 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
   let action: ReactNode;
   if (!mine) {
     action = <Note>This swap was prepared for {shortAccount(owner)}. Sign in with that wallet to approve it.</Note>;
-  } else if (wallet.account !== owner) {
+  } else if (!byDeposit && wallet.account !== owner) {
     action = (
       <Note>
         Connect <span className="font-mono">{shortAccount(owner)}</span> in your wallet to approve.
@@ -209,11 +227,13 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
           onClick={() => approve.mutate()}
           className={clsx(STICKER, "w-full gap-2 rounded-well px-4 py-[11px]")}
         >
-          {approve.isPending ? <Loader2 size={16} className="animate-spin" /> : <Wallet size={16} />}
-          {approve.isPending ? "Getting the final quote…" : "Approve in wallet"}
+          {approve.isPending ? <Loader2 size={16} className="animate-spin" /> : byDeposit ? <Send size={16} /> : <Wallet size={16} />}
+          {approve.isPending ? "Getting the final quote…" : byDeposit ? "Approve and get the deposit address" : "Approve in wallet"}
         </button>
         <p className="text-center text-xs text-text-2">
-          Your wallet shows the exact transaction before anything is sent.
+          {byDeposit
+            ? `Next you send ${proposal.from.amount} ${proposal.from.symbol} on ${chainName(proposal.from.chain)} yourself. Nothing is sent before that.`
+            : "Your wallet shows the exact transaction before anything is sent."}
           {countdown && (
             <>
               {" "}
@@ -223,6 +243,8 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
         </p>
       </div>
     );
+  } else if (status === "awaiting_deposit" && swap?.deposit) {
+    action = <DepositPanel swap={swap} onUpdate={(s) => qc.setQueryData(key, s)} />;
   } else {
     action = <Progress swap={swap!} proposal={proposal} />;
   }
@@ -351,21 +373,113 @@ function TxLink({ href, children }: { href: string; children: ReactNode }) {
   );
 }
 
+function Copyable({ label, value, copy }: { label: string; value: string; copy?: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <div className="rounded-well bg-surface-2 px-3 py-2">
+      <div className="text-xs text-text-2">{label}</div>
+      <div className="flex items-center gap-2">
+        <span className="min-w-0 flex-1 font-mono text-sm [overflow-wrap:anywhere]">{value}</span>
+        <button
+          type="button"
+          onClick={() =>
+            void navigator.clipboard
+              .writeText(copy ?? value)
+              .then(() => {
+                setDone(true);
+                setTimeout(() => setDone(false), 1500);
+              })
+              .catch(() => {})
+          }
+          aria-label={`Copy ${label.toLowerCase()}`}
+          className="grid size-7 shrink-0 place-items-center rounded-full text-text-2 hover:bg-surface hover:text-text"
+        >
+          {done ? <Check size={14} className="text-ok" /> : <Copy size={14} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** A deposit swap after approval: what to send where, until the transfer is seen. */
+function DepositPanel({ swap, onUpdate }: { swap: SwapView; onUpdate: (s: SwapView) => void }) {
+  const d = swap.deposit!;
+  const [hash, setHash] = useState("");
+  const left = useCountdown(d.deadline ?? "", Boolean(d.deadline));
+  const sent = useMutation({
+    mutationFn: async () => {
+      const r = await post<{ swap: SwapView }>(swap.id, { action: "sent", txHash: hash.trim() || null });
+      onUpdate(r.swap);
+    },
+  });
+  const chain = chainName(d.chain);
+  return (
+    <div className="flex flex-col gap-2 text-[13px]">
+      <p className="m-0 leading-snug">
+        Send exactly{" "}
+        <strong className="font-mono">
+          {d.amount} {d.symbol}
+        </strong>{" "}
+        on <strong>{chain}</strong> to this address, from any wallet or exchange.
+        {left && (
+          <>
+            {" "}
+            Time left: <span className="font-mono">{left}</span>.
+          </>
+        )}
+      </p>
+      <Copyable label="Deposit address" value={d.address} />
+      {d.memo && <Copyable label="Memo (required)" value={d.memo} />}
+      <Copyable label="Amount" value={`${d.amount} ${d.symbol}`} copy={d.amount.replaceAll(",", "")} />
+      <p className="m-0 text-xs leading-snug text-text-2">
+        Use this address once, and only on {chain}. Less than the amount, or a transfer after the time runs out, is refunded to{" "}
+        <span className="font-mono [overflow-wrap:anywhere]">{d.refund_to}</span>, minus network fees.
+      </p>
+      <label className="mt-1 flex flex-col gap-1">
+        <span className="text-xs text-text-2">Sent it? The transaction hash speeds things up (optional).</span>
+        <input
+          value={hash}
+          onChange={(e) => setHash(e.target.value)}
+          placeholder="Transaction hash"
+          spellCheck={false}
+          autoCapitalize="none"
+          autoComplete="off"
+          className="rounded-well border border-line bg-bg px-3 py-2 font-mono text-sm placeholder:text-text-2/50 focus:border-muted focus:outline-none"
+        />
+      </label>
+      <button type="button" disabled={sent.isPending} onClick={() => sent.mutate()} className={clsx(QUIET, "rounded-well px-3 py-[9px] text-sm text-text")}>
+        {sent.isPending ? <Loader2 size={14} className="animate-spin" /> : null} I sent it
+      </button>
+      <p className="m-0 flex items-center gap-2 text-xs text-text-2" role="status">
+        <Loader2 size={12} className="animate-spin" /> Watching the address: the swap starts by itself once your transfer arrives.
+      </p>
+      {sent.error && <p className="m-0 text-sm text-bad">{sent.error.message}</p>}
+    </div>
+  );
+}
+
 function Progress({ swap, proposal }: { swap: SwapView; proposal: Proposal }) {
   const r = swap.result;
+  const byDeposit = proposal.pay === "deposit";
   const links = (
     <div className="mt-1 flex flex-wrap gap-3">
-      {swap.tx_url && <TxLink href={swap.tx_url}>Your transaction</TxLink>}
-      {r?.dest_tx_url && <TxLink href={r.dest_tx_url}>Payout on {proposal.to.chain}</TxLink>}
+      {swap.tx_url && <TxLink href={swap.tx_url}>{byDeposit ? "Your deposit" : "Your transaction"}</TxLink>}
+      {r?.dest_tx_url && <TxLink href={r.dest_tx_url}>Payout on {chainName(proposal.to.chain)}</TxLink>}
     </div>
   );
   if (IN_FLIGHT.has(swap.status)) {
     const text =
       swap.status === "signing"
         ? "Confirm in your wallet…"
-        : r?.upstream === "PENDING_DEPOSIT" || r?.upstream === "KNOWN_DEPOSIT_TX"
-          ? "Waiting for the deposit to land…"
-          : "Swapping…";
+        : r?.upstream === "INCOMPLETE_DEPOSIT"
+          ? (r.reason ?? "Less than the quoted amount arrived.")
+          : r?.upstream === "KNOWN_DEPOSIT_TX"
+            ? "Deposit seen, waiting for it to confirm…"
+            : r?.upstream === "PENDING_DEPOSIT" || (byDeposit && !r?.upstream)
+              ? byDeposit
+                ? `Waiting for your ${proposal.from.symbol} to arrive on ${chainName(proposal.from.chain)}…`
+                : "Waiting for the deposit to land…"
+              : "Swapping…";
     return (
       <div>
         <p className="flex items-center gap-2 text-sm" role="status">
@@ -398,7 +512,12 @@ function Progress({ swap, proposal }: { swap: SwapView; proposal: Proposal }) {
   return (
     <div>
       <p className="flex items-center gap-2 text-sm text-bad">
-        <XCircle size={15} /> {swap.status === "expired" ? "This quote expired. Ask for a new one." : `Failed. ${r?.reason ?? ""}`}
+        <XCircle size={15} />{" "}
+        {swap.status !== "expired"
+          ? `Failed. ${r?.reason ?? ""}`
+          : swap.deposit
+            ? `No deposit arrived in time. Anything sent later is refunded to ${swap.deposit.refund_to ?? "your refund address"}.`
+            : "This quote expired. Ask for a new one."}
       </p>
       {links}
     </div>
