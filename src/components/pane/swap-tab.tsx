@@ -4,13 +4,22 @@ import { clsx } from "clsx";
 import { AlertTriangle, ArrowDownUp, Loader2, Wallet } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { networkOf, WALLET } from "@/lib/near/network";
+import { addressError, addressHint, chainName } from "@/lib/swap/chains";
 import { useSession } from "../session/use-session";
 import { EYEBROW, QUIET, STICKER } from "../ui/styles";
 import { QuoteCard, SwapCard } from "../chat/swap-card";
-import { usePane, type ProposalItem, type QuoteItem, type SwapForm } from "./pane-context";
+import { ChainAssetPicker, useCrossAssets } from "./chain-asset-picker";
+import { offNear, usePane, type ProposalItem, type QuoteItem, type SwapForm, type SwapIn, type SwapMode } from "./pane-context";
 import { TokenPicker } from "./token-picker";
 
 const SLIPPAGE = [0.5, 1, 2];
+/** Cross-chain swaps go through NEAR Intents, which runs on mainnet only. */
+const CROSS = WALLET.id === "mainnet";
+const USDC_BASE = "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near";
+const MODES: { id: SwapMode; label: string }[] = [
+  { id: "swap", label: "Swap" },
+  { id: "cross", label: "Cross-chain" },
+];
 const FIELDS = ["from", "to", "amount"] as const;
 
 /** Types the chat's swap into the form, field by field, each time it fills it. */
@@ -59,12 +68,49 @@ export function SwapTab() {
   const focused = swaps.find((i) => i.id === pane.swapFocus) ?? swaps.at(-1);
   const earlier = swaps.filter((i) => i !== focused && i.status === "done").reverse();
 
+  const cross = form.mode === "cross";
+  const assets = useCrossAssets(CROSS && cross);
+  const inward = cross && form.dir === "in";
+  // The side on another chain, and that chain: where the user's address belongs.
+  const otherId = (inward ? form.from : form.to).trim();
+  const otherChain = cross ? (assets.byId.get(otherId)?.chain ?? null) : null;
+  const address = form.address.trim();
+  const addressErr = otherChain ? addressError(otherChain, address) : null;
+
   const amountOk = /^\d*\.?\d+$/.test(form.amount) && Number(form.amount) > 0;
-  const ready = form.from.trim().length >= 2 && form.to.trim().length >= 2 && amountOk;
+  const ready = form.from.trim().length >= 2 && form.to.trim().length >= 2 && amountOk && !addressErr;
   // Swaps run on the wallet's network; a token from the other one can only be checked.
-  const off = [form.from, form.to].map((t) => t.trim()).find((t) => t.includes(".") && networkOf(t).id !== WALLET.id);
-  const input = { from: form.from.trim(), to: form.to.trim(), amount: form.amount.trim(), slippage_pct: form.slippage };
+  const off = cross ? undefined : [form.from, form.to].map((t) => t.trim()).find((t) => t.includes(".") && !t.includes(":") && networkOf(t).id !== WALLET.id);
+  const input: SwapIn = {
+    from: form.from.trim(),
+    to: form.to.trim(),
+    amount: form.amount.trim(),
+    slippage_pct: form.slippage,
+    ...(cross && address ? (inward ? { refund_to: address } : { recipient: address }) : {}),
+  };
   const signedIn = Boolean(session.account);
+  // A cross-chain swap can't be proposed without the user's address on the other chain.
+  const canPropose = ready && !off && signedIn && (!cross || Boolean(address));
+
+  const switchMode = (mode: SwapMode) => {
+    if (mode === form.mode) return;
+    const usdc = assets.data?.chains.find((c) => c.chain === "base")?.assets.find((a) => a.symbol === "USDC")?.id ?? USDC_BASE;
+    const back = form.other ?? (mode === "cross" ? { from: usdc, to: "NEAR" } : { from: "NEAR", to: "" });
+    set({
+      mode,
+      from: back.from,
+      to: back.to,
+      dir: mode === "cross" ? (offNear(back.from) ? "in" : "out") : form.dir,
+      other: { from: form.from, to: form.to },
+    });
+  };
+  const flip = () => set({ from: form.to, to: form.from, ...(cross ? { dir: inward ? "out" : "in" } : {}) });
+
+  const picker = (which: "from" | "to", label: string) => {
+    const nearSide = which === "from" ? !inward : inward;
+    if (!cross) return <TokenPicker label={label} value={v(which)} typing={Boolean(typed)} onChange={(id) => set({ [which]: id })} />;
+    return <ChainAssetPicker side={nearSide ? "near" : "other"} label={label} value={v(which)} typing={Boolean(typed)} onChange={(id) => set({ [which]: id })} />;
+  };
 
   const waiting = focused?.kind === "proposal" && focused.status === "done";
 
@@ -88,7 +134,25 @@ export function SwapTab() {
           }}
           className="flex flex-col gap-1.5 rounded-card border border-line bg-surface p-3"
         >
-          <Field label="You pay" hint="Pick a token or paste a contract">
+          <div role="group" aria-label="Swap mode" className="mb-1.5 grid grid-cols-2 gap-1 rounded-full border border-line bg-bg p-0.5">
+            {MODES.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => switchMode(m.id)}
+                aria-pressed={form.mode === m.id}
+                disabled={m.id === "cross" && !CROSS}
+                title={m.id === "cross" && !CROSS ? "Cross-chain swaps run on mainnet" : undefined}
+                className={clsx(
+                  "rounded-full px-3 py-1 text-xs font-medium",
+                  form.mode === m.id ? "bg-accent/15 text-accent-deep" : "text-text-2 hover:bg-surface-2 hover:text-text",
+                )}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <Field label="You pay" hint={!cross ? "Pick a token or paste a contract" : inward ? "Sent from any wallet or exchange" : "From your NEAR wallet"}>
             <input
               value={v("amount")}
               onChange={(e) => set({ amount: e.target.value.replace(/[^\d.]/g, "") })}
@@ -97,25 +161,46 @@ export function SwapTab() {
               aria-label="Amount"
               className="w-full min-w-0 flex-1 bg-transparent font-mono text-xl font-semibold placeholder:text-text-2/50 focus:outline-none"
             />
-            <div className="w-[min(55%,200px)] shrink-0">
-              <TokenPicker label="Pay with" value={v("from")} typing={Boolean(typed)} onChange={(from) => set({ from })} />
-            </div>
+            <div className="w-[min(55%,200px)] shrink-0">{picker("from", "Pay with")}</div>
           </Field>
           <div className="relative z-[1] -my-3.5 flex justify-center">
             <button
               type="button"
-              onClick={() => set({ from: form.to, to: form.from })}
-              aria-label="Swap sides"
+              onClick={flip}
+              aria-label={cross ? (inward ? "Switch to out of NEAR" : "Switch to into NEAR") : "Swap sides"}
               className="grid size-8 place-items-center rounded-full border border-line bg-surface text-text-2 hover:bg-surface-2 hover:text-text"
             >
               <ArrowDownUp size={14} />
             </button>
           </div>
-          <Field label="You get" hint={WALLET.id === "testnet" ? "Testnet tokens, nearvana ones first" : "Tokens with a Rhea pool"}>
-            <div className="min-w-0 flex-1">
-              <TokenPicker label="Receive" value={v("to")} typing={Boolean(typed)} onChange={(to) => set({ to })} />
-            </div>
+          <Field
+            label="You get"
+            hint={cross ? (inward ? "In your NEAR wallet" : "At your address below") : WALLET.id === "testnet" ? "Testnet tokens, nearvana ones first" : "Tokens with a Rhea pool"}
+          >
+            <div className="min-w-0 flex-1">{picker("to", "Receive")}</div>
           </Field>
+          {cross && (
+            <label className="mt-1 flex flex-col gap-1 rounded-well border border-line bg-bg px-3 py-2.5">
+              <span className="flex items-baseline justify-between gap-2 text-xs">
+                <span className="text-text-2">
+                  {inward ? "Refund to" : "Receive at"} your {otherChain ? chainName(otherChain) : "other chain"} address
+                </span>
+                <span className="truncate text-text-2/75">{inward ? "If the swap can't complete" : "Where the output is sent"}</span>
+              </span>
+              <input
+                value={form.address}
+                onChange={(e) => set({ address: e.target.value })}
+                placeholder={otherChain ? addressHint(otherChain) : "Pick the asset first"}
+                aria-label={inward ? "Refund address" : "Receiving address"}
+                aria-invalid={Boolean(addressErr)}
+                spellCheck={false}
+                autoCapitalize="none"
+                autoComplete="off"
+                className="w-full min-w-0 bg-transparent font-mono text-sm placeholder:text-text-2/50 focus:outline-none"
+              />
+              {addressErr && <span className="text-xs text-bad">{addressErr}</span>}
+            </label>
+          )}
           <div className="flex items-center justify-between gap-2 pt-2">
             <span className="text-xs text-text-2">Max slippage</span>
             <div className="flex gap-1">
@@ -140,16 +225,25 @@ export function SwapTab() {
               <AlertTriangle size={13} className="mt-0.5 shrink-0" /> Swaps run on NEAR {WALLET.id} here. {off} is a {networkOf(off).id} token: it can be checked, not swapped.
             </p>
           )}
-          {!off && WALLET.id === "testnet" && <p className="text-xs text-text-2">Testnet swap through Rhea&apos;s testnet pools, signed by your testnet wallet.</p>}
+          {cross && inward && (
+            <p className="text-xs text-text-2">No wallet signature: after you approve, you get a deposit address and send the exact amount from any wallet or exchange.</p>
+          )}
+          {!cross && !off && WALLET.id === "testnet" && <p className="text-xs text-text-2">Testnet swap through Rhea&apos;s testnet pools, signed by your testnet wallet.</p>}
           <div className="grid grid-cols-2 gap-2 pt-1.5">
             <button type="submit" disabled={!ready || Boolean(off)} className={clsx(QUIET, "rounded-well px-3 py-[9px] text-sm text-text")}>
               Get quote
             </button>
             <button
               type="button"
-              disabled={!ready || Boolean(off) || !signedIn}
+              disabled={!canPropose}
               onClick={() => pane.propose(input)}
-              title={signedIn ? "Checks the token bought, then shows the approval card" : "Sign in with your wallet to swap"}
+              title={
+                !signedIn
+                  ? "Sign in with your wallet to swap"
+                  : cross && !address
+                    ? `Enter your ${otherChain ? chainName(otherChain) : ""} address first`
+                    : "Checks the token bought, then shows the approval card"
+              }
               className={clsx(STICKER, "rounded-well px-3 py-[9px] text-sm")}
             >
               <Wallet size={14} /> Review swap

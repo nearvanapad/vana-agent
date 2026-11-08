@@ -140,7 +140,7 @@ export function CheckTab() {
             <button
               type="button"
               onClick={() => {
-                pane.dispatch({ t: "form", form: { to: report.token } });
+                pane.dispatch({ t: "form", form: { to: report.token, mode: "swap" } });
                 pane.dispatch({ t: "open", tab: "swap" });
               }}
               className={clsx(STICKER, "min-w-0 rounded-well px-2.5 py-2 text-[13px]")}

@@ -10,7 +10,7 @@ export type PaneState = {
   shown: string[];
   /** Tokens the user checked in the pane themselves, not through the chat. */
   checked: string[];
-  swap: { from: string; to: string; amount: string } | null;
+  swap: { from: string; to: string; amount: string; cross?: boolean } | null;
 };
 
 function paneNow(p: PaneState | undefined): string {
@@ -23,7 +23,7 @@ function paneNow(p: PaneState | undefined): string {
   else lines.push("The side pane is open on the Check tab.");
   if (p.shown.length && p.focus !== "compare") lines.push(`Tokens in the pane's list: ${p.shown.map((t) => `\`${t}\``).join(", ")}.`);
   if (p.checked.length) lines.push(`The user checked these in the pane themselves, not through the chat: ${p.checked.map((t) => `\`${t}\``).join(", ")}.`);
-  if (p.swap && (p.swap.to || p.swap.amount)) lines.push(`The pane's swap form: ${p.swap.amount || "?"} ${p.swap.from || "?"} → ${p.swap.to || "?"}.`);
+  if (p.swap && (p.swap.to || p.swap.amount)) lines.push(`The pane's ${p.swap.cross ? "cross-chain " : ""}swap form: ${p.swap.amount || "?"} ${p.swap.from || "?"} → ${p.swap.to || "?"}.`);
   return `\n- ${lines.join("\n- ")}`;
 }
 

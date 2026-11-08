@@ -36,7 +36,7 @@ export function GateCard({ compact }: { compact?: boolean }) {
   const swappable = networkOf(token).id === WALLET.id;
 
   const getTokens = () => {
-    pane.dispatch({ t: "form", form: { from: "NEAR", to: token } });
+    pane.dispatch({ t: "form", form: { from: "NEAR", to: token, mode: "swap" } });
     pane.dispatch({ t: "open", tab: "swap" });
   };
 

@@ -24,13 +24,37 @@ type Base = { id: string; origin: Origin; status: Status; error?: string; at: nu
 export type ReportItem = Base & { kind: "report"; token: string; done: CheckDone[]; report?: ReportView };
 export type SearchItem = Base & { kind: "search"; query: string; matches?: TokenMatch[] };
 export type ScreenItem = Base & { kind: "screen"; platform: string; result?: ScreenResult };
-export type SwapIn = { from: string; to: string; amount: string; slippage_pct?: number };
+export type SwapIn = { from: string; to: string; amount: string; slippage_pct?: number; recipient?: string; refund_to?: string };
 export type QuoteItem = Base & { kind: "quote"; input: SwapIn; quote?: SwapQuote };
 export type ProposalItem = Base & { kind: "proposal"; input: SwapIn; proposal?: Proposal };
 export type PaneItem = ReportItem | SearchItem | ScreenItem | QuoteItem | ProposalItem;
 
 export type Tab = "check" | "swap";
-export type SwapForm = { from: string; to: string; amount: string; slippage: number };
+export type SwapMode = "swap" | "cross";
+export type SwapForm = {
+  from: string;
+  to: string;
+  amount: string;
+  slippage: number;
+  /** Swap: NEAR tokens. Cross: one side on NEAR, the other on another chain. */
+  mode: SwapMode;
+  /** Cross only: into NEAR (paid on the other chain, by deposit) or out of NEAR (paid from the wallet). */
+  dir: "in" | "out";
+  /** Cross only: the user's address on the other chain (refund when paying from it, recipient when receiving there). */
+  address: string;
+  /** The other mode's pair, put back when switching to it. */
+  other: { from: string; to: string } | null;
+};
+
+/**
+ * An intents asset id off NEAR: bridged tokens (`nep141:…omft.near`), multi-tokens (`nep245:…`)
+ * and the rest (`1cs_v1:…`). `nep141:<near token>` and plain contracts are on NEAR.
+ */
+export const offNear = (id: string): boolean => {
+  const v = id.trim();
+  if (!v.includes(":")) return false;
+  return !v.startsWith("nep141:") || v.endsWith(".omft.near");
+};
 
 type State = {
   open: boolean;
@@ -58,7 +82,16 @@ type Action =
   | { t: "fillSwap"; input: SwapIn };
 
 // NVANA by default: the token that unlocks the chat and the checks.
-const EMPTY_FORM: SwapForm = { from: "NEAR", to: networkOf(GATE_TOKEN).id === WALLET.id ? GATE_TOKEN : "", amount: "", slippage: 1 };
+const EMPTY_FORM: SwapForm = {
+  from: "NEAR",
+  to: networkOf(GATE_TOKEN).id === WALLET.id ? GATE_TOKEN : "",
+  amount: "",
+  slippage: 1,
+  mode: "swap",
+  dir: "in",
+  address: "",
+  other: null,
+};
 
 function reducer(s: State, a: Action): State {
   switch (a.t) {
@@ -79,16 +112,32 @@ function reducer(s: State, a: Action): State {
       return { ...s, focus: a.id, compare: a.compare === undefined ? s.compare : a.compare, tab: "check" };
     case "swapFocus":
       return { ...s, swapFocus: a.id, tab: "swap" };
-    case "form":
-      return { ...s, form: { ...s.form, ...a.form } };
+    case "form": {
+      const form = { ...s.form, ...a.form };
+      // A NEAR token picked from elsewhere (a report, the gate) lands in the Swap mode, paid from NEAR.
+      if (a.form.mode === "swap" && s.form.mode === "cross" && offNear(form.from)) form.from = "NEAR";
+      return { ...s, form };
+    }
     case "fillCheck":
       return { ...s, fill: { ...s.fill, check: a.text, n: s.fill.n + 1 } };
-    case "fillSwap":
+    case "fillSwap": {
+      const i = a.input;
+      const mode: SwapMode = i.refund_to || i.recipient || offNear(i.from) || offNear(i.to) ? "cross" : "swap";
       return {
         ...s,
-        form: { from: a.input.from, to: a.input.to, amount: a.input.amount, slippage: a.input.slippage_pct ?? s.form.slippage },
-        fill: { ...s.fill, swap: a.input, sn: s.fill.sn + 1 },
+        form: {
+          from: i.from,
+          to: i.to,
+          amount: i.amount,
+          slippage: i.slippage_pct ?? s.form.slippage,
+          mode,
+          dir: i.refund_to || offNear(i.from) ? "in" : i.recipient || offNear(i.to) ? "out" : s.form.dir,
+          address: i.refund_to ?? i.recipient ?? (mode === s.form.mode ? s.form.address : ""),
+          other: mode === s.form.mode ? s.form.other : { from: s.form.from, to: s.form.to },
+        },
+        fill: { ...s.fill, swap: i, sn: s.fill.sn + 1 },
       };
+    }
   }
 }
 
@@ -344,7 +393,10 @@ export function PaneProvider({ conversationId, children }: { conversationId: str
       focus: cur.focus === "compare" ? "compare" : focused?.kind === "report" ? focused.token : null,
       shown: [...latest.keys()].slice(-12),
       checked: [...latest.values()].filter((i) => i.origin === "pane").map((i) => i.token).slice(-10),
-      swap: cur.form.to || cur.form.amount ? { from: cur.form.from, to: cur.form.to, amount: cur.form.amount.replace(/[^\d.]/g, "") } : null,
+      swap:
+        cur.form.to || cur.form.amount
+          ? { from: cur.form.from, to: cur.form.to, amount: cur.form.amount.replace(/[^\d.]/g, ""), cross: cur.form.mode === "cross" }
+          : null,
     };
   }, []);
 

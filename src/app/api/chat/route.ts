@@ -31,7 +31,7 @@ const Body = z.object({
       focus: Id.nullable(),
       shown: z.array(Id).max(12),
       checked: z.array(Id).max(10),
-      swap: z.object({ from: Id.or(z.literal("")), to: Id.or(z.literal("")), amount: z.string().max(40).regex(/^[\d.]*$/) }).nullable(),
+      swap: z.object({ from: Id.or(z.literal("")), to: Id.or(z.literal("")), amount: z.string().max(40).regex(/^[\d.]*$/), cross: z.boolean().optional() }).nullable(),
     })
     .optional(),
 });
