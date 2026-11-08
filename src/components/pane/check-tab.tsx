@@ -81,24 +81,29 @@ export function CheckTab() {
             autoCapitalize="none"
             className="min-w-0 flex-1 rounded-well border border-line bg-surface px-3 py-2 font-mono text-[13px] placeholder:font-sans placeholder:text-text-2/70 focus:border-muted focus:outline-none"
           />
-          {web.available && (
-            <button
-              type="button"
-              onClick={() => web.set(!web.on)}
-              aria-pressed={web.on}
-              title={web.on ? "Web search on: each new check also searches the web (one search, about half a cent)" : "Also search the web for scam, hack or delisting reports"}
-              className={clsx(
-                "flex shrink-0 items-center gap-1.5 rounded-well border px-2.5 text-xs",
-                web.on ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line text-text-2 hover:bg-surface-2",
-              )}
-            >
-              <Globe size={13} /> Web
-            </button>
-          )}
           <button type="submit" disabled={!q.trim()} className={clsx(STICKER, "rounded-well px-3.5 py-[7px] text-sm")}>
             <Search size={14} strokeWidth={2.2} /> Check
           </button>
         </form>
+
+        {web.available && (
+          <label className="-mt-1 flex cursor-pointer items-center gap-2.5 text-xs">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={web.on}
+              onClick={() => web.set(!web.on)}
+              className={clsx("relative h-[18px] w-8 shrink-0 rounded-full transition-colors", web.on ? "bg-accent-deep" : "bg-line")}
+            >
+              <span className={clsx("absolute top-[3px] size-3 rounded-full bg-bg transition-[left]", web.on ? "left-[17px]" : "left-[3px]")} />
+            </button>
+            <span className="flex min-w-0 items-center gap-1.5">
+              <Globe size={12} className="shrink-0 text-text-2" />
+              <span className="text-text">Search the web too</span>
+              <span className="truncate text-text-2">· scam and hack news; slower, small extra cost</span>
+            </span>
+          </label>
+        )}
 
         {chips.length > 0 && (
           <div className="flex gap-1.5 overflow-x-auto pb-0.5 [scrollbar-width:thin]">
