@@ -100,7 +100,11 @@ Checked against mainnet on 2 Nov 2026. Each section answers what the risk check 
 - **Fees.** Set per key in Aurora's portal and split 60/40 with Aurora. Aurora's cut is at least 10 bps on non-stable pairs and 2 bps on stables, with a 500 bps cap. Below a 25 bps setting, the floor makes the user pay more than the fee we set.
 - **Tokens.** `/tokens` answers `{tokens, asset_stats}`, not a bare list.
 - **Selecting it.** `INTENTS_PROVIDER=aurora` plus `AURORA_INTENTS_KEY`. Each swap keeps the upstream that quoted it.
-- **Not probed live yet** (no key). `pnpm probe:intents` compares it with 1Click once `AURORA_INTENTS_KEY` is set.
+- **Probed 8 Nov with our key** (integrator fee 0 in the portal).
+  - `/quote` answers 200 (1Click: 201). For 100 NEAR → USDC it echoed `appFees` of 10 bps: Aurora's floor, nothing for us. 1Click without a JWT took 20 bps on the same pair, so Aurora paid out about 0.1% more.
+  - `/tokens` lists the same 216 assets on the same chain slugs as 1Click.
+  - The swap service ran end to end on it: quotes, a cross-chain quote, a deposit swap's real quote with its deposit address, and `/status` by that address.
+  - A wrong key still gets `/tokens` (200), but `/quote` answers 404 "Application key not found".
 
 ## Nearly — `nearlytrade.near`
 
