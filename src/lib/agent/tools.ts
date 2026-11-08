@@ -63,7 +63,13 @@ function readStranger(guard: Guard, r: RiskReport) {
 }
 
 const swapArgs = z.object({
-  from: z.string().min(2).max(120).describe('What the user pays with, on NEAR: "NEAR", or a token contract id (e.g. usdt.tether-token.near).'),
+  from: z
+    .string()
+    .min(2)
+    .max(120)
+    .describe(
+      'What the user pays with: "NEAR", a NEAR token contract id (e.g. usdt.tether-token.near), or a NEAR Intents asset_id from list_swap_assets to pay from another chain (the user then sends it themselves to a deposit address; `to` must be on NEAR).',
+    ),
   to: z
     .string()
     .min(2)
@@ -72,6 +78,11 @@ const swapArgs = z.object({
   amount: z.string().min(1).max(40).describe('Amount of `from` in normal units, e.g. "10" or "0.5". Never raw units.'),
   slippage_pct: z.number().min(0.1).max(5).optional().describe("Max price slippage in percent. Default 1."),
   recipient: z.string().max(128).optional().describe("Only when `to` is on another chain: the user's address there. Never make one up."),
+  refund_to: z
+    .string()
+    .max(128)
+    .optional()
+    .describe("Only when `from` is on another chain: the user's own address on that chain, refunded if the swap can't complete. Only an address the user typed; never make one up."),
 });
 
 export type ToolContext = { account: string | null; conversationId: string | null };
@@ -87,7 +98,7 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
 
     propose_swap: tool({
       description:
-        "Show the user a swap approval card for their wallet. Re-checks the balance and shows the last risk_report of the token bought, if there is one (it never runs one). The user approves and signs in their wallet; you never sign. Only after the user clearly asked to swap these exact assets and amount.",
+        "Show the user a swap approval card for their wallet. Re-checks the balance and shows the last risk_report of the token bought, if there is one (it never runs one). The user approves and signs in their wallet; you never sign. When paying from another chain, approving shows a deposit address the user sends to themselves. Only after the user clearly asked to swap these exact assets and amount.",
       inputSchema: swapArgs,
       execute: async (args): Promise<Proposal> => {
         guard.assertAction("propose_swap");

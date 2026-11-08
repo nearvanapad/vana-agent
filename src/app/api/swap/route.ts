@@ -15,6 +15,8 @@ const Body = z.object({
   to: z.string().min(2).max(120),
   amount: z.string().min(1).max(40),
   slippage_pct: z.number().min(0.1).max(5).optional(),
+  recipient: z.string().max(128).optional(),
+  refund_to: z.string().max(128).optional(),
   conversationId: z.string().regex(CONVERSATION_ID).optional(),
 });
 

@@ -11,6 +11,7 @@ import { HttpError, ref, type SourceRef } from "../sources/http";
 import * as intents from "../sources/intents";
 import { dcl, dclPoolUrl } from "../sources/rhea";
 import { fromRaw, resolveAsset, SwapError, toRaw, WNEAR, type Asset } from "./assets";
+import { addressError, chainName, dryAddress } from "./chains";
 import { bestRoute, quotePath, swapMsg } from "./rhea-route";
 import { swapRisk, type SwapRisk } from "./risk";
 
@@ -32,6 +33,8 @@ export type SwapInput = {
   slippage_pct?: number;
   /** Address on the destination chain; only for assets off NEAR. */
   recipient?: string;
+  /** The user's address on the paying chain, refunded if the swap fails; only when paying from off NEAR. */
+  refund_to?: string;
 };
 
 type Side = { symbol: string; asset: string; chain: string; token: string | null; amount: string; raw: string; usd: number | null };
@@ -48,6 +51,13 @@ export type SwapQuote = {
   slippage_pct: number;
   /** Who receives the output: the signer on NEAR, or an address on another chain. */
   recipient: string;
+  /**
+   * How the input is paid: "wallet" = the NEAR wallet signs it; "deposit" = the user sends it on
+   * another chain, from any wallet or exchange, to a deposit address shown after approval.
+   */
+  pay?: "wallet" | "deposit";
+  /** Where a failed deposit swap is refunded, on the paying chain. */
+  refund_to?: string | null;
   fees: string[];
   pool_ids: string[] | null;
   time_estimate_s: number | null;
@@ -66,7 +76,31 @@ export type Proposal = SwapQuote & {
   expires_at: string;
 };
 
-export type SwapStatus = "proposed" | "signing" | "submitted" | "processing" | "success" | "refunded" | "failed" | "expired";
+export type SwapStatus =
+  | "proposed"
+  | "signing"
+  /** A deposit swap was approved: its deposit address is out, waiting for the user's transfer. */
+  | "awaiting_deposit"
+  | "submitted"
+  | "processing"
+  | "success"
+  | "refunded"
+  | "failed"
+  | "expired";
+
+/** Where and what to send, for a deposit swap once approved. */
+export type DepositInfo = {
+  address: string;
+  /** Sent with the transfer, on chains that need one. */
+  memo: string | null;
+  /** The exact amount to send, every decimal. */
+  amount: string;
+  symbol: string;
+  chain: string;
+  /** After this the deposit is refunded rather than swapped. */
+  deadline: string | null;
+  refund_to: string | null;
+};
 
 export type SwapView = {
   id: string;
@@ -77,7 +111,15 @@ export type SwapView = {
   min_out: string | null;
   tx_hash: string | null;
   tx_url: string | null;
-  result: { amount_out?: string | null; refunded?: string | null; reason?: string | null; upstream?: string; dest_tx_url?: string | null } | null;
+  deposit: DepositInfo | null;
+  result: {
+    amount_out?: string | null;
+    refunded?: string | null;
+    reason?: string | null;
+    upstream?: string;
+    dest_tx_url?: string | null;
+    origin_tx_url?: string | null;
+  } | null;
   updated_at: string;
 };
 
@@ -112,38 +154,81 @@ const side = (a: Asset, raw: bigint): Side => {
 
 const minus = (raw: bigint, bps: number) => (raw * BigInt(10_000 - bps)) / 10_000n;
 
-type Resolved = { from: Asset; to: Asset; raw: bigint; bps: number; recipient: string | null };
+type Resolved = {
+  from: Asset;
+  to: Asset;
+  raw: bigint;
+  bps: number;
+  /** Null on a quote that didn't name one; the quote then prices with a stand-in. */
+  recipient: string | null;
+  /** The refund address on the paying chain, for a deposit swap. */
+  refundTo: string | null;
+  pay: "wallet" | "deposit";
+};
 
-async function resolve(input: SwapInput, account: string | null): Promise<Resolved> {
+/** A checked address on `chain`, or null when none was given. */
+function address(chain: string, given: string | undefined, what: string): string | null {
+  const a = given?.trim() || null;
+  if (!a) return null;
+  const err = addressError(chain, a);
+  if (err) throw new SwapError(`The ${what} address: ${err}`);
+  return a;
+}
+
+/**
+ * Checks what the user or the model asked for. `real` is a swap about to be proposed or approved:
+ * then every address must be there. A quote may leave them out.
+ */
+async function resolve(input: SwapInput, account: string | null, real: boolean): Promise<Resolved> {
   const [from, to] = await Promise.all([resolveAsset(input.from), resolveAsset(input.to)]);
-  if (from.chain !== "near" || !from.token) {
-    throw new SwapError(`Swaps are paid from a NEAR wallet, so the asset you pay with must be on NEAR (${from.symbol} is on ${from.chain}).`);
+  const pay = from.chain === "near" ? "wallet" : "deposit";
+  if (pay === "wallet" && !from.token) throw new SwapError(`${from.symbol} can't be paid from a NEAR wallet.`);
+  if (pay === "deposit" && to.chain !== "near") {
+    throw new SwapError(`One side of a swap must be on NEAR: ${from.symbol} is on ${chainName(from.chain)} and ${to.symbol} on ${chainName(to.chain)}.`);
   }
   if (from.id === to.id && from.native === to.native) throw new SwapError("That's the same asset on both sides.");
   const raw = toRaw(input.amount, from.decimals);
   if (raw <= 0n) throw new SwapError("The amount must be more than zero.");
+
   let recipient: string | null;
   if (to.chain === "near") {
     // Output on NEAR always goes to the wallet that signs, so text in a token name can't redirect it.
     recipient = account;
   } else {
-    recipient = input.recipient?.trim() || null;
-    if (!recipient) throw new SwapError(`${to.symbol} is on ${to.chain}: give the ${to.chain} address that should receive it.`);
-    if (recipient.length > 128 || /\s/.test(recipient)) throw new SwapError("That recipient address doesn't look valid.");
+    recipient = address(to.chain, input.recipient, "receiving");
+    if (!recipient && (real || !dryAddress(to.chain))) {
+      throw new SwapError(`${to.symbol} is on ${chainName(to.chain)}: give the ${chainName(to.chain)} address that should receive it.`);
+    }
   }
-  return { from, to, raw, bps: slippageBps(input.slippage_pct), recipient };
+  let refundTo: string | null = null;
+  if (pay === "deposit") {
+    refundTo = address(from.chain, input.refund_to, "refund");
+    if (!refundTo && (real || !dryAddress(from.chain))) {
+      throw new SwapError(
+        `${from.symbol} is paid on ${chainName(from.chain)}: give your ${chainName(from.chain)} address, where it's refunded if the swap can't complete.`,
+      );
+    }
+  }
+  return { from, to, raw, bps: slippageBps(input.slippage_pct), recipient, refundTo, pay };
+}
+
+/** How long a real quote's deposit address stays open. A transfer from another chain needs longer, Bitcoin and Zcash longest. */
+function depositMinutes(r: Resolved): number {
+  if (r.pay === "wallet") return 30;
+  return ["btc", "zec"].includes(r.from.chain) ? 180 : 60;
 }
 
 async function intentsQuote(r: Resolved, account: string | null, dry: boolean) {
+  const standIn = (chain: string) => dryAddress(chain) ?? DRY_ACCOUNT;
   return intents.quote({
     dry,
     originAsset: r.from.id,
     destinationAsset: r.to.id,
     amount: r.raw.toString(),
     slippageBps: r.bps,
-    recipient: r.recipient ?? account ?? DRY_ACCOUNT,
-    refundTo: account ?? DRY_ACCOUNT,
-    deadline: new Date(Date.now() + (dry ? 10 : 30) * 60_000),
+    recipient: r.recipient ?? (r.to.chain === "near" ? (account ?? DRY_ACCOUNT) : standIn(r.to.chain)),
+    refundTo: r.pay === "wallet" ? (account ?? DRY_ACCOUNT) : (r.refundTo ?? standIn(r.from.chain)),
+    deadline: new Date(Date.now() + (dry ? 10 : depositMinutes(r)) * 60_000),
   });
 }
 
@@ -165,7 +250,7 @@ export function quoteSwap(input: SwapInput, account: string | null): Promise<Swa
 }
 
 async function quoteSwapOn(input: SwapInput, account: string | null): Promise<SwapQuote> {
-  return priced(await resolve(input, account), account);
+  return priced(await resolve(input, account, false), account);
 }
 
 async function priced(r: Resolved, account: string | null): Promise<SwapQuote> {
@@ -186,10 +271,14 @@ async function priced(r: Resolved, account: string | null): Promise<SwapQuote> {
         min_out: fromRaw(q.data.quote.minAmountOut, to.decimals),
         min_out_raw: q.data.quote.minAmountOut,
         slippage_pct: bps / 100,
-        recipient: r.recipient ?? account ?? "(your wallet)",
+        recipient: r.recipient ?? (to.chain === "near" ? "(your wallet)" : `(your ${chainName(to.chain)} address)`),
+        pay: r.pay,
+        refund_to: r.refundTo,
         fees: [
           ...(fee ? [`${intents.PROVIDER_LABEL[q.provider]} fee ${fee / 100}%, included in the quote.`] : []),
-          "Plus NEAR gas and, if needed, token registration (under 0.01 NEAR).",
+          r.pay === "wallet"
+            ? "Plus NEAR gas and, if needed, token registration (under 0.01 NEAR)."
+            : `Plus the ${chainName(from.chain)} network fee for your transfer.`,
         ],
         pool_ids: null,
         time_estimate_s: q.data.quote.timeEstimate ?? null,
@@ -221,6 +310,8 @@ async function priced(r: Resolved, account: string | null): Promise<SwapQuote> {
     min_out_raw: min.toString(),
     slippage_pct: bps / 100,
     recipient: account ?? "(your wallet)",
+    pay: "wallet",
+    refund_to: null,
     fees: ["Rhea pool fees are included in the quote.", "Plus NEAR gas and, if needed, token registration (under 0.01 NEAR)."],
     pool_ids: route.pool_ids,
     time_estimate_s: 5,
@@ -256,12 +347,15 @@ export function proposeSwap(input: SwapInput, account: string, conversationId: s
 }
 
 async function proposeSwapOn(input: SwapInput, account: string, conversationId: string | null): Promise<Proposal> {
-  const r = await resolve(input, account);
-  const have = await spendable(r.from, account);
-  if (have < r.raw) {
-    throw new SwapError(
-      `${account} has ${fromRaw(have, r.from.decimals)} ${r.from.symbol} available${r.from.native ? " (after keeping 0.05 NEAR for gas)" : ""}, less than ${input.amount}.`,
-    );
+  const r = await resolve(input, account, true);
+  // A deposit swap is paid on another chain, whose balance we can't read.
+  if (r.pay === "wallet") {
+    const have = await spendable(r.from, account);
+    if (have < r.raw) {
+      throw new SwapError(
+        `${account} has ${fromRaw(have, r.from.decimals)} ${r.from.symbol} available${r.from.native ? " (after keeping 0.05 NEAR for gas)" : ""}, less than ${input.amount}.`,
+      );
+    }
   }
   const q = await priced(r, account);
 
@@ -278,7 +372,14 @@ async function proposeSwapOn(input: SwapInput, account: string, conversationId: 
     if (buy) warnings.push(`${q.to.symbol} takes a ${buy}% buy tax, so you receive about ${buy}% less than quoted.`);
     if (sell) warnings.push(`Selling ${q.to.symbol} later costs a ${sell}% tax.`);
   }
-  if (r.to.chain !== "near") warnings.push(`The output goes to ${q.recipient} on ${r.to.chain}. Check the address: a wrong one can't be undone.`);
+  if (r.to.chain !== "near") {
+    warnings.push(`The output goes to ${q.recipient} on ${chainName(r.to.chain)}. Check the address: a wrong one can't be undone.`);
+  }
+  if (r.pay === "deposit") {
+    warnings.push(
+      `You send ${q.from.amount} ${q.from.symbol} on ${chainName(r.from.chain)} yourself, from any wallet or exchange, to the address shown after you approve. If the swap can't complete it is refunded to ${r.refundTo} on ${chainName(r.from.chain)}.`,
+    );
+  }
 
   const id = `swp_${randomBytes(9).toString("base64url")}`;
   const now = Date.now();
@@ -315,7 +416,15 @@ function load(id: string, account: string): Row {
 
 const stored = (row: Row) => JSON.parse(row.proposal) as { proposal: Proposal; input: SwapInput };
 
-type StoredQuote = { provider?: intents.Provider; depositMemo?: string; min_out?: string };
+type StoredQuote = {
+  provider?: intents.Provider;
+  depositAddress?: string;
+  depositMemo?: string;
+  deadline?: string;
+  min_out?: string;
+  /** Deposit swaps: the exact amount to send, every decimal. */
+  amount_exact?: string;
+};
 const storedQuote = (row: Row): StoredQuote | null => (row.quote ? (JSON.parse(row.quote) as StoredQuote) : null);
 
 /** The upstream that issued the swap's deposit address. Swaps from before providers were pinned used 1Click. */
@@ -331,7 +440,9 @@ function update(id: string, fields: Partial<Omit<Row, "id" | "account" | "route"
 
 function view(row: Row): SwapView {
   const { proposal } = stored(row);
-  const quote = row.quote ? (JSON.parse(row.quote) as { min_out?: string }) : null;
+  const quote = storedQuote(row);
+  const result = row.result ? (JSON.parse(row.result) as SwapView["result"]) : null;
+  const byDeposit = proposal.pay === "deposit";
   return {
     id: row.id,
     account: row.account,
@@ -339,8 +450,21 @@ function view(row: Row): SwapView {
     proposal,
     min_out: quote?.min_out ?? null,
     tx_hash: row.tx_hash,
-    tx_url: row.tx_hash ? `${EXPLORER_TX}${row.tx_hash}` : null,
-    result: row.result ? JSON.parse(row.result) : null,
+    // A deposit is a transfer on another chain: link it once the upstream reports where it landed.
+    tx_url: byDeposit ? (result?.origin_tx_url ?? null) : row.tx_hash ? `${EXPLORER_TX}${row.tx_hash}` : null,
+    deposit:
+      byDeposit && row.deposit_address && quote?.amount_exact
+        ? {
+            address: row.deposit_address,
+            memo: quote.depositMemo ?? null,
+            amount: quote.amount_exact,
+            symbol: proposal.from.symbol,
+            chain: proposal.from.chain,
+            deadline: quote.deadline ?? null,
+            refund_to: proposal.refund_to ?? null,
+          }
+        : null,
+    result,
     updated_at: new Date(row.updated_at).toISOString(),
   };
 }
@@ -401,7 +525,7 @@ async function approveSwapOn(id: string, account: string): Promise<{ swap: SwapV
     update(id, { status: "expired" });
     throw new SwapError("This quote expired. Ask for a new one.");
   }
-  const r = await resolve(input, account);
+  const r = await resolve(input, account, true);
   const floor = BigInt(proposal.min_out_raw);
   let txs: WalletTx[];
 
@@ -415,12 +539,19 @@ async function approveSwapOn(id: string, account: string): Promise<{ swap: SwapV
     if (BigInt(qq.amountOut) < floor) {
       throw new SwapError(`The price moved: you'd now get ${fromRaw(qq.amountOut, r.to.decimals)} ${r.to.symbol}, below the ${proposal.min_out} minimum you saw. Ask for a new quote.`);
     }
-    txs = await buildTxs(row, r, { depositAddress: qq.depositAddress });
-    update(id, {
-      status: "signing",
-      quote: JSON.stringify({ ...qq, provider: q.provider, min_out: fromRaw(qq.minAmountOut, r.to.decimals) }),
-      deposit_address: qq.depositAddress,
-    });
+    const kept = { ...qq, provider: q.provider, min_out: fromRaw(qq.minAmountOut, r.to.decimals) };
+    if (r.pay === "deposit") {
+      // Nothing to sign: the user sends the deposit on the other chain, then the swap is tracked.
+      txs = [];
+      update(id, {
+        status: "awaiting_deposit",
+        quote: JSON.stringify({ ...kept, amount_exact: fromRaw(qq.amountIn, r.from.decimals, r.from.decimals) }),
+        deposit_address: qq.depositAddress,
+      });
+    } else {
+      txs = await buildTxs(row, r, { depositAddress: qq.depositAddress });
+      update(id, { status: "signing", quote: JSON.stringify(kept), deposit_address: qq.depositAddress });
+    }
   } else {
     const pools = proposal.pool_ids!;
     const out = await quotePath(pools, r.from.token!, r.to.token!, r.raw);
@@ -452,6 +583,24 @@ async function submitSwapOn(id: string, account: string, txHash: string | null):
   return refreshSwap(id, account);
 }
 
+/**
+ * The user says they sent a deposit swap's transfer, with its hash when they have it. The hash only
+ * speeds things up: the swap is tracked by its deposit address either way.
+ */
+export function sentSwap(id: string, account: string, txHash: string | null): Promise<SwapView> {
+  return onNetwork(WALLET, () => sentSwapOn(id, account, txHash));
+}
+
+async function sentSwapOn(id: string, account: string, txHash: string | null): Promise<SwapView> {
+  const row = load(id, account);
+  if (row.status !== "awaiting_deposit") throw new SwapError(`This swap is ${row.status}, not waiting for a deposit.`);
+  const hash = txHash?.trim() || null;
+  if (hash && !/^[A-Za-z0-9]{16,128}$/.test(hash)) throw new SwapError("That doesn't look like a transaction hash.");
+  update(id, { status: "submitted", tx_hash: hash });
+  if (hash && row.deposit_address) await intents.submitDeposit(providerOf(row), hash, row.deposit_address);
+  return refreshSwap(id, account);
+}
+
 /** The wallet was closed or refused: the proposal can be approved again until it expires. */
 export function rejectSwap(id: string, account: string, failed?: { txHash?: string; reason: string }): SwapView {
   const row = load(id, account);
@@ -465,6 +614,8 @@ export function rejectSwap(id: string, account: string, failed?: { txHash?: stri
 const FINAL: SwapStatus[] = ["success", "refunded", "failed", "expired"];
 /** Upstream is asked at most this often per swap. */
 const REFRESH_MS = 3000;
+/** A deposit that never arrived stops being tracked this long after its deadline. */
+const DEPOSIT_GRACE_MS = 30 * 60_000;
 
 /** The swap as it stands, asking 1Click or the chain when it's in flight. */
 export function refreshSwap(id: string, account: string): Promise<SwapView> {
@@ -478,24 +629,33 @@ async function refreshSwapOn(id: string, account: string): Promise<SwapView> {
     update(id, { status: "expired" });
     return view(load(id, account));
   }
-  if (FINAL.includes(row.status) || !["submitted", "processing"].includes(row.status)) return view(row);
+  if (FINAL.includes(row.status) || !["awaiting_deposit", "submitted", "processing"].includes(row.status)) return view(row);
   if (!row.tx_hash && row.route === "rhea") return view(row);
-  if (row.status === "processing" && Date.now() - row.updated_at < REFRESH_MS) return view(row);
+  const waiting = row.status === "awaiting_deposit";
+  if ((row.status === "processing" || waiting) && Date.now() - row.updated_at < REFRESH_MS) return view(row);
 
   try {
     if (row.route === "intents" && row.deposit_address) {
       const s = await intents.status(providerOf(row), row.deposit_address, depositMemoOf(row));
       const d = s.swapDetails;
-      const status: SwapStatus =
+      let status: SwapStatus =
         s.status === "SUCCESS" ? "success" : s.status === "REFUNDED" ? "refunded" : s.status === "FAILED" ? "failed" : "processing";
+      // Nothing has arrived at a deposit swap's address yet: keep waiting until well past its deadline.
+      if (s.status === "PENDING_DEPOSIT" && waiting) {
+        const deadline = Date.parse(storedQuote(row)?.deadline ?? "");
+        status = Number.isFinite(deadline) && Date.now() > deadline + DEPOSIT_GRACE_MS ? "expired" : "awaiting_deposit";
+      }
       update(id, {
         status,
         result: JSON.stringify({
           upstream: s.status,
           amount_out: d?.amountOutFormatted ?? null,
           refunded: d?.refundedAmount && d.refundedAmount !== "0" ? d.refundedAmountFormatted : null,
-          reason: d?.refundReason ?? null,
+          reason:
+            d?.refundReason ??
+            (s.status === "INCOMPLETE_DEPOSIT" ? "Less than the quoted amount arrived. Send the rest before the deadline, or what arrived is refunded." : null),
           dest_tx_url: d?.destinationChainTxHashes?.[0]?.explorerUrl ?? null,
+          origin_tx_url: d?.originChainTxHashes?.[0]?.explorerUrl ?? null,
         }),
       });
     } else if (row.route === "rhea") {
@@ -504,7 +664,8 @@ async function refreshSwapOn(id: string, account: string): Promise<SwapView> {
       else update(id, { status: "processing" });
     }
   } catch {
-    update(id, { status: "processing" });
+    // Upstream unreachable: try again on the next poll, without moving a swap that waits for its deposit.
+    update(id, { status: waiting ? "awaiting_deposit" : "processing" });
   }
   return view(load(id, account));
 }
