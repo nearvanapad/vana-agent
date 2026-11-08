@@ -1,6 +1,6 @@
 # VANA — NEAR token agent
 
-Chat agent for NEAR. Ask whether a NEP-141 token is safe and get a plain-language risk report where every number cites its source. Then swap it through NEAR Intents (1Click). The AI only reads. Your wallet signs every transaction.
+Chat agent for NEAR. Ask whether a NEP-141 token is safe and get a plain-language risk report where every number cites its source. Then swap it through NEAR Intents: between NEAR tokens, or across chains (BTC, ETH, SOL, USDC on Base, …), in and out of NEAR. The AI only reads. Your wallet signs every transaction.
 
 > Work in progress for the NEAR Hackathon (Unstoppable DeFi · AI Security & Defense).
 
@@ -15,6 +15,14 @@ pnpm dev                # http://localhost:3000 (landing), /app (the chat)
 Or `docker compose up --build`.
 
 Probe a contract: `pnpm probe <account>`. This prints the code hash, full-access keys and callable methods.
+
+Probe the swap upstreams: `pnpm probe:intents`. This prints what a user pays at each fee setting and checks every cross-chain pair.
+
+Swaps reach NEAR Intents through one upstream, set by `INTENTS_PROVIDER`:
+- `oneclick` (the default): 1Click directly.
+- `aurora`: Aurora's Swap API, which fronts the same solvers.
+
+Our fee is set server-side only. For 1Click it is `INTENTS_FEE_BPS` and `INTENTS_FEE_RECIPIENT`; for Aurora it is set per key in Aurora's portal. See `.env.example`.
 
 ## Deploy
 

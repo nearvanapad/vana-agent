@@ -13,6 +13,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "probe": "tsx scripts/probe.ts",
+    "probe:intents": "tsx scripts/intents-probe.ts",
     "smoke": "tsx scripts/smoke.ts",
     "demo-token": "tsx scripts/demo-token.ts"
   },

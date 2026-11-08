@@ -49,7 +49,10 @@ Checked against mainnet on 2 Nov 2026. Each section answers what the risk check 
 ## NEAR Intents 1Click — `https://1click.chaindefuser.com/v0`
 
 - **Re-probed 5 Nov: up.** `/tokens`, dry and real `/quote`, `/status` and `/deposit/submit` all answer as below. (Down with Cloudflare 521 on 2 Nov, so the UI keeps an "Intents unavailable" path.)
-- Without `ONECLICK_JWT`, every quote carries a 0.2% app fee (`quoteRequest.appFees`), already taken out of `amountOut`.
+- **Fees (re-probed 8 Nov with `pnpm probe:intents`).** Every fee is already taken out of `amountOut` and echoed in `quoteRequest.appFees`.
+  - Without `ONECLICK_JWT`, 1Click adds its own 20 bps.
+  - Without a JWT but with our own `appFees` of 20 bps, the quote carries 10 + 20 bps, so the user pays 30 bps. This agrees with the partner terms: our fee is split 50/50, and 1Click's half has a 20 bps minimum.
+  - Our fee comes from `INTENTS_FEE_BPS` and `INTENTS_FEE_RECIPIENT`. It is unset until the fee is decided.
 - Errors come back as `{message}`, e.g. 400 "No liquidity available". A dry quote with a `recipient`/`refundTo` account that doesn't exist answers 500.
 - A real quote's `depositAddress` is a fresh 64-hex implicit account: register it on the origin token (`storage_deposit`) before the `ft_transfer`.
 - API:
@@ -83,6 +86,21 @@ Checked against mainnet on 2 Nov 2026. Each section answers what the risk check 
   3. `ft_transfer({receiver_id: depositAddress, amount})` with 1 yocto.
   - Every call needs about 30 Tgas. Put the payment last so the batch outcome is the payment's outcome.
   - The output token must be registered for the recipient (`storage_deposit` on the token) before delivery.
+
+- **Paying from another chain.** A quote with `originAsset` off NEAR and `refundTo` on that chain returns a deposit address there. Examples are an EVM address for Base or `bc1…` for BTC. The user sends to it from any wallet. Status is then read by that address, like a NEAR deposit.
+  - **Deadline.** The quote's `deadline` comes back about 3 days out, whatever we ask for, and the card shows that value.
+  - **Stand-in addresses.** Dry quotes need a well-formed address on each side. Burn and system addresses (`0x…dEaD`, Solana's `111…1`) answer "refundTo is not valid", so guests price with ordinary addresses (`src/lib/swap/chains.ts`).
+  - **Recipients and refunds.** A NEAR `recipient` or `refundTo` that doesn't exist answers 500.
+  - **Upstream limits (8 Nov).** BNB Chain has a $1,000 minimum. Tron has a $100 minimum inbound. Gnosis USDC isn't quoted.
+
+## Aurora Intents Swap API — `https://intents-api.aurora.dev/api/{op}/{key}`
+
+- **What it is.** It fronts the same 1Click solvers (ops: `tokens`, `quote`, `deposit/submit`, `status`, plus `incidents` and a transaction history), with the same request bodies and status enum.
+- **Key.** The key goes in the path; there is no auth header. It comes from studio.aurora.dev and is not secret, but it stays server-side here and out of citations.
+- **Fees.** Set per key in Aurora's portal and split 60/40 with Aurora. Aurora's cut is at least 10 bps on non-stable pairs and 2 bps on stables, with a 500 bps cap. Below a 25 bps setting, the floor makes the user pay more than the fee we set.
+- **Tokens.** `/tokens` answers `{tokens, asset_stats}`, not a bare list.
+- **Selecting it.** `INTENTS_PROVIDER=aurora` plus `AURORA_INTENTS_KEY`. Each swap keeps the upstream that quoted it.
+- **Not probed live yet** (no key). `pnpm probe:intents` compares it with 1Click once `AURORA_INTENTS_KEY` is set.
 
 ## Nearly — `nearlytrade.near`
 
