@@ -6,16 +6,21 @@ import type { Tier, TierInfo } from "@/lib/agent/model";
 
 const KEY = "vana:tier";
 
+/** What the server's AI offers: NEAR AI tiers (or null) and whether checks can search the web. */
+export function useModels() {
+  return useQuery({
+    queryKey: ["model-tiers"],
+    queryFn: async () => (await fetch("/api/models")).json() as Promise<{ tiers: TierInfo[] | null; default: Tier; webSearch?: boolean }>,
+    staleTime: 5 * 60_000,
+  });
+}
+
 /**
  * The NEAR AI model tier the user picked, remembered in this browser. Null tiers when the server
  * doesn't run on NEAR AI Cloud: then there is nothing to pick.
  */
 export function useTier() {
-  const q = useQuery({
-    queryKey: ["model-tiers"],
-    queryFn: async () => (await fetch("/api/models")).json() as Promise<{ tiers: TierInfo[] | null; default: Tier }>,
-    staleTime: 5 * 60_000,
-  });
+  const q = useModels();
   const [picked, setPicked] = useState<Tier | null>(null);
   useEffect(() => {
     try {

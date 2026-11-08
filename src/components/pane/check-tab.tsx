@@ -1,7 +1,7 @@
 "use client";
 
 import { clsx } from "clsx";
-import { AlertTriangle, ArrowLeftRight, BadgeCheck, Columns3, Loader2, MessageSquare, RefreshCw, Rocket, Search, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowLeftRight, BadgeCheck, Columns3, Globe, Loader2, MessageSquare, RefreshCw, Rocket, Search, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { networkOf, WALLET } from "@/lib/near/network";
 import { QUIET, STICKER } from "../ui/styles";
@@ -10,6 +10,7 @@ import { RiskCard, shortAccount } from "../chat/risk-card";
 import { GateCard, useUnlocked } from "../gate/gate-card";
 import { Compare } from "./compare";
 import { usePane, useWake, type PaneItem, type ReportItem, type ScreenItem, type SearchItem } from "./pane-context";
+import { useWebSearch, WebPanel } from "./web-panel";
 
 /** Every check a full report runs, in the order the card lists them. */
 export const CHECKS = [
@@ -49,6 +50,7 @@ export function CheckTab() {
   const chips = strip(pane.items);
   const doneReports = pane.reports.filter((r) => r.status === "done");
   const unlocked = useUnlocked();
+  const web = useWebSearch();
 
   if (unlocked === false)
     return (
@@ -79,6 +81,20 @@ export function CheckTab() {
             autoCapitalize="none"
             className="min-w-0 flex-1 rounded-well border border-line bg-surface px-3 py-2 font-mono text-[13px] placeholder:font-sans placeholder:text-text-2/70 focus:border-muted focus:outline-none"
           />
+          {web.available && (
+            <button
+              type="button"
+              onClick={() => web.set(!web.on)}
+              aria-pressed={web.on}
+              title={web.on ? "Web search on: each new check also searches the web (one search, about half a cent)" : "Also search the web for scam, hack or delisting reports"}
+              className={clsx(
+                "flex shrink-0 items-center gap-1.5 rounded-well border px-2.5 text-xs",
+                web.on ? "border-accent-deep bg-accent/15 text-accent-deep" : "border-line text-text-2 hover:bg-surface-2",
+              )}
+            >
+              <Globe size={13} /> Web
+            </button>
+          )}
           <button type="submit" disabled={!q.trim()} className={clsx(STICKER, "rounded-well px-3.5 py-[7px] text-sm")}>
             <Search size={14} strokeWidth={2.2} /> Check
           </button>
@@ -119,7 +135,7 @@ export function CheckTab() {
         ) : !focused ? (
           <Start />
         ) : focused.kind === "report" ? (
-          <ReportBody item={focused} />
+          <ReportBody item={focused} web={web.on} />
         ) : focused.kind === "search" ? (
           <SearchBody item={focused} />
         ) : focused.kind === "screen" ? (
@@ -235,11 +251,17 @@ function Failed({ text, retry }: { text: string; retry?: () => void }) {
   );
 }
 
-function ReportBody({ item }: { item: ReportItem }) {
+function ReportBody({ item, web }: { item: ReportItem; web: boolean }) {
   const pane = usePane();
   if (item.status === "error") return <Failed text={item.error ?? "The check failed."} retry={() => pane.check(item.token, { id: item.id })} />;
   if (!item.report) return <Progress item={item} />;
-  return <RiskCard report={item.report} />;
+  return (
+    <>
+      <RiskCard report={item.report} />
+      {/* Only checks run here: reports the chat made never search the web. */}
+      {web && item.origin === "pane" && <WebPanel token={item.report.token} />}
+    </>
+  );
 }
 
 /** The checks as they land: each row waits with a spinner until its result is in. */

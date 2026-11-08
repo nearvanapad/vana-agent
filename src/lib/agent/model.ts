@@ -68,6 +68,11 @@ function tier(id: Tier): TierInfo {
   return { id, label: d.label, hint: d.hint, model: model || d.model, think: think || model || d.think };
 }
 
+/** The chat runs on NEAR AI Cloud, so its extras (web search) are there too. */
+export const NEAR_AI = isNearAI && Boolean(API_KEY);
+export const NEAR_AI_BASE = BASE_URL.replace(/\/$/, "");
+export const NEAR_AI_KEY = isNearAI ? API_KEY : undefined;
+
 /** The tiers the user can pick from: only on NEAR AI Cloud. */
 export const TIERS: TierInfo[] | null = isNearAI ? TIER_IDS.map(tier) : null;
 
