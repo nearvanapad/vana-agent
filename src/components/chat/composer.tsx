@@ -34,14 +34,10 @@ function TierPicker({ tiers, tier, onTier }: { tiers: TierInfo[]; tier: Tier; on
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="n-fade fixed inset-0 z-[60] grid place-items-center bg-[rgb(10_22_18/0.72)] p-4 backdrop-blur-[4px]">
-          <Dialog.Content className="n-pop flex w-full max-w-[420px] flex-col gap-3 rounded-[20px] border border-line bg-surface p-[clamp(18px,5vw,24px)] shadow-[0_30px_60px_rgb(0_0_0/0.45)]">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-1">
-                <Dialog.Title className="text-base font-semibold">Who runs the AI</Dialog.Title>
-                <Dialog.Description className="text-[13px] text-pretty text-text-2">
-                  VANA&apos;s AI runs on NEAR AI Cloud. Pick how private your chat is. Checks and swaps work the same in every mode.
-                </Dialog.Description>
-              </div>
+          <Dialog.Content className="n-pop flex w-full max-w-[360px] flex-col gap-3 rounded-[20px] border border-line bg-surface p-[clamp(16px,4vw,20px)] shadow-[0_30px_60px_rgb(0_0_0/0.45)]">
+            <div className="flex items-center justify-between gap-3">
+              <Dialog.Title className="text-base font-semibold">Who runs the AI</Dialog.Title>
+              <Dialog.Description className="sr-only">Pick how private your chat with VANA is.</Dialog.Description>
               <Dialog.Close aria-label="Close" className="grid size-7 shrink-0 place-items-center rounded-full text-text-2 hover:bg-surface-2 hover:text-text">
                 <X size={15} />
               </Dialog.Close>
@@ -67,22 +63,18 @@ function TierPicker({ tiers, tier, onTier }: { tiers: TierInfo[]; tier: Tier; on
                     <span className={clsx("mt-0.5 shrink-0", t.id === "incognito" ? "text-text-2" : "text-ok")}>
                       {t.id === "incognito" ? <EyeOff size={16} /> : <ShieldCheck size={16} />}
                     </span>
-                    <span className="flex min-w-0 flex-col gap-0.5">
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="flex items-center gap-2 text-sm font-semibold">
                         {t.label}
                         {on && <Check size={14} className="text-accent-deep" />}
+                        <span className="ml-auto font-mono text-[11px] font-normal text-text-2/70">{short(t.model)}</span>
                       </span>
-                      <span className="text-[13px] leading-snug text-pretty text-text-2">{t.hint}</span>
-                      <span className="font-mono text-[11px] text-text-2/80">{short(t.model)}</span>
+                      <span className="text-[13px] leading-snug text-text-2">{t.hint}</span>
                     </span>
                   </button>
                 );
               })}
             </div>
-            <p className="text-xs text-text-2">
-              A TEE is a sealed part of the chip: what runs inside can&apos;t be seen by whoever hosts it, and it can prove what code it runs. Think
-              mode uses the same model, reasoning longer.
-            </p>
           </Dialog.Content>
         </Dialog.Overlay>
       </Dialog.Portal>

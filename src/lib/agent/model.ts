@@ -31,7 +31,7 @@ export const TIER_IDS: Tier[] = ["private", "partner", "incognito"];
 export type TierInfo = {
   id: Tier;
   label: string;
-  /** One or two plain sentences: who runs the model and who can read the messages. */
+  /** One short sentence: who runs the model and who can read the chat. */
   hint: string;
   model: string;
   think: string;
@@ -44,19 +44,19 @@ export type TierInfo = {
 const DEFAULTS: Record<Tier, Omit<TierInfo, "id">> = {
   private: {
     label: "Private",
-    hint: "Runs on NEAR AI's own secure hardware (a TEE). Nobody, NEAR included, can read your messages, and that can be verified.",
+    hint: "NEAR AI's secure hardware. No one can read your chat.",
     model: "z-ai/glm-5.3-flash",
     think: "z-ai/glm-5.3-flash",
   },
   partner: {
     label: "Partner",
-    hint: "A larger open model in a partner's secure hardware (Tinfoil's TEE). Private too, vouched for by that partner. Costs more.",
+    hint: "Bigger model on a partner's secure hardware. Costs more.",
     model: "z-ai/glm-5.3",
     think: "z-ai/glm-5.3",
   },
   incognito: {
     label: "Incognito",
-    hint: "OpenAI's model, reached through NEAR AI's secure gateway: OpenAI doesn't know it's you, but it can read the messages.",
+    hint: "OpenAI through NEAR AI. Anonymous, but not private.",
     model: "openai/gpt-6-luna",
     think: "openai/gpt-6-luna",
   },
