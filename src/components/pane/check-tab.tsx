@@ -99,8 +99,8 @@ export function CheckTab() {
             </button>
             <span className="flex min-w-0 items-center gap-1.5">
               <Globe size={12} className="shrink-0 text-text-2" />
-              <span className="text-text">Search the web too</span>
-              <span className="truncate text-text-2">· scam and hack news; slower, small extra cost</span>
+              <span className="text-text">Web Search</span>
+              <span className="truncate text-text-2">· slower, small cost</span>
             </span>
           </label>
         )}
