@@ -28,26 +28,37 @@ const compatible = createOpenAICompatible({ name: "llm", baseURL: BASE_URL, apiK
 export type Tier = "private" | "partner" | "incognito";
 export const TIER_IDS: Tier[] = ["private", "partner", "incognito"];
 
-export type TierInfo = { id: Tier; label: string; hint: string; model: string; think: string };
+export type TierInfo = {
+  id: Tier;
+  label: string;
+  /** One or two plain sentences: who runs the model and who can read the messages. */
+  hint: string;
+  model: string;
+  think: string;
+};
 
+/**
+ * One model per tier; Think asks it to reason more. Picked by running this agent's own tasks on
+ * them (risk check, quote, cross-chain quote with a refund address): every pair answered all three.
+ */
 const DEFAULTS: Record<Tier, Omit<TierInfo, "id">> = {
   private: {
     label: "Private",
-    hint: "Open models on NEAR AI's own TEE GPUs: nobody, NEAR included, sees your messages, and it can be verified.",
+    hint: "Runs on NEAR AI's own secure hardware (a TEE). Nobody, NEAR included, can read your messages, and that can be verified.",
     model: "z-ai/glm-5.3-flash",
-    think: "deepseek-ai/DeepSeek-V4.1-Flash-1017",
+    think: "z-ai/glm-5.3-flash",
   },
   partner: {
     label: "Partner",
-    hint: "Larger open models in a partner's TEE (Tinfoil), attested by that partner.",
+    hint: "A larger open model in a partner's secure hardware (Tinfoil's TEE). Private too, vouched for by that partner. Costs more.",
     model: "z-ai/glm-5.3",
     think: "z-ai/glm-5.3",
   },
   incognito: {
     label: "Incognito",
-    hint: "OpenAI or Anthropic models through NEAR AI's TEE gateway, without your identity; the model itself runs at the provider, outside a TEE.",
+    hint: "OpenAI's model, reached through NEAR AI's secure gateway: OpenAI doesn't know it's you, but it can read the messages.",
     model: "openai/gpt-6-luna",
-    think: "openai/gpt-5.6-luna",
+    think: "openai/gpt-6-luna",
   },
 };
 
@@ -69,13 +80,21 @@ export function llmConfigured(): boolean {
 }
 
 /**
- * The model for a reply, and the reasoning effort to ask for. Anthropic models behind NEAR AI
- * refuse a reasoning effort, so none is sent to them.
+ * The reasoning effort to ask for, or none:
+ * - Anthropic models behind NEAR AI refuse a reasoning effort.
+ * - GLM-5.3 Flash thinks fully by default, and any effort it is sent cuts that to a minimum: so
+ *   "low" for a quick reply, and nothing for Think.
  */
+function effort(id: string, think: boolean): "low" | "high" | undefined {
+  if (id.startsWith("anthropic/")) return undefined;
+  if (id === "z-ai/glm-5.3-flash") return think ? undefined : "low";
+  return think ? "high" : "low";
+}
+
+/** The model for a reply, and the reasoning effort to ask for. */
 export function chatModel(think: boolean, pick?: Tier) {
   const t = TIERS?.find((x) => x.id === (pick ?? DEFAULT_TIER));
   const id = t ? (think ? t.think : t.model) : think ? THINK_MODEL : MODEL;
   const model = isOpenAI ? openai.responses(id) : compatible.chatModel(id);
-  const reasoning = id.startsWith("anthropic/") ? undefined : think ? ("high" as const) : ("low" as const);
-  return { id, model, reasoning };
+  return { id, model, reasoning: effort(id, think) };
 }

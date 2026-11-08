@@ -1,38 +1,92 @@
 "use client";
 
 import { clsx } from "clsx";
-import { ArrowUp, Brain, ShieldCheck, Square } from "lucide-react";
+import * as Dialog from "@radix-ui/react-dialog";
+import { ArrowUp, Brain, Check, EyeOff, ShieldCheck, Square, X } from "lucide-react";
 import type { Tier, TierInfo } from "@/lib/agent/model";
 import { STICKER } from "@/components/ui/styles";
 import { useEffect, useRef, useState } from "react";
 
-/** Which NEAR AI model tier answers: private (NEAR AI TEE), partner (partner TEE) or incognito (OpenAI/Anthropic). */
-function TierPicker({ tiers, tier, onTier, think }: { tiers: TierInfo[]; tier: Tier; onTier: (t: Tier) => void; think: boolean }) {
+const short = (id: string) => id.replace(/^[^/]+\//, "");
+
+/**
+ * Which NEAR AI model tier answers: a pill showing the current one, opening a small dialog that
+ * explains each and lets the user switch.
+ */
+function TierPicker({ tiers, tier, onTier }: { tiers: TierInfo[]; tier: Tier; onTier: (t: Tier) => void }) {
+  const [open, setOpen] = useState(false);
   const cur = tiers.find((t) => t.id === tier) ?? tiers[0]!;
   return (
-    <label
-      title={`NEAR AI model: ${cur.label}. ${cur.hint} (${think ? cur.think : cur.model})`}
-      className={clsx(
-        "relative flex min-w-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs focus-within:border-muted",
-        tier === "incognito" ? "border-line text-text-2 hover:bg-surface-2" : "border-ok/40 text-ok hover:bg-surface-2",
-      )}
-    >
-      <ShieldCheck size={13} className="shrink-0" />
-      <span className="hidden sm:inline">NEAR AI:</span>
-      <select
-        value={tier}
-        onChange={(e) => onTier(e.target.value as Tier)}
-        aria-label="NEAR AI model privacy"
-        className="min-w-0 cursor-pointer appearance-none bg-transparent pr-3 font-medium focus:outline-none"
-      >
-        {tiers.map((t) => (
-          <option key={t.id} value={t.id}>
-            {t.label}
-          </option>
-        ))}
-      </select>
-      <span aria-hidden className="pointer-events-none absolute right-2.5 text-[0.6rem]">▾</span>
-    </label>
+    <Dialog.Root open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger asChild>
+        <button
+          type="button"
+          title={`NEAR AI: ${cur.label}. ${cur.hint}`}
+          className={clsx(
+            "flex min-w-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs hover:bg-surface-2",
+            tier === "incognito" ? "border-line text-text-2" : "border-ok/40 text-ok",
+          )}
+        >
+          {tier === "incognito" ? <EyeOff size={13} className="shrink-0" /> : <ShieldCheck size={13} className="shrink-0" />}
+          <span className="hidden sm:inline">NEAR AI:</span>
+          <span className="font-medium">{cur.label}</span>
+        </button>
+      </Dialog.Trigger>
+      <Dialog.Portal>
+        <Dialog.Overlay className="n-fade fixed inset-0 z-[60] grid place-items-center bg-[rgb(10_22_18/0.72)] p-4 backdrop-blur-[4px]">
+          <Dialog.Content className="n-pop flex w-full max-w-[420px] flex-col gap-3 rounded-[20px] border border-line bg-surface p-[clamp(18px,5vw,24px)] shadow-[0_30px_60px_rgb(0_0_0/0.45)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <Dialog.Title className="text-base font-semibold">Who runs the AI</Dialog.Title>
+                <Dialog.Description className="text-[13px] text-pretty text-text-2">
+                  VANA&apos;s AI runs on NEAR AI Cloud. Pick how private your chat is. Checks and swaps work the same in every mode.
+                </Dialog.Description>
+              </div>
+              <Dialog.Close aria-label="Close" className="grid size-7 shrink-0 place-items-center rounded-full text-text-2 hover:bg-surface-2 hover:text-text">
+                <X size={15} />
+              </Dialog.Close>
+            </div>
+            <div role="radiogroup" aria-label="NEAR AI mode" className="flex flex-col gap-2">
+              {tiers.map((t) => {
+                const on = t.id === tier;
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    onClick={() => {
+                      onTier(t.id);
+                      setOpen(false);
+                    }}
+                    className={clsx(
+                      "flex gap-3 rounded-well border px-3 py-2.5 text-left",
+                      on ? "border-accent-deep bg-accent/10" : "border-line hover:bg-surface-2",
+                    )}
+                  >
+                    <span className={clsx("mt-0.5 shrink-0", t.id === "incognito" ? "text-text-2" : "text-ok")}>
+                      {t.id === "incognito" ? <EyeOff size={16} /> : <ShieldCheck size={16} />}
+                    </span>
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span className="flex items-center gap-2 text-sm font-semibold">
+                        {t.label}
+                        {on && <Check size={14} className="text-accent-deep" />}
+                      </span>
+                      <span className="text-[13px] leading-snug text-pretty text-text-2">{t.hint}</span>
+                      <span className="font-mono text-[11px] text-text-2/80">{short(t.model)}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-xs text-text-2">
+              A TEE is a sealed part of the chip: what runs inside can&apos;t be seen by whoever hosts it, and it can prove what code it runs. Think
+              mode uses the same model, reasoning longer.
+            </p>
+          </Dialog.Content>
+        </Dialog.Overlay>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 
@@ -103,7 +157,7 @@ export function Composer(props: {
           >
             <Brain size={13} /> Think
           </button>
-          {props.tiers && props.tier && props.onTier && <TierPicker tiers={props.tiers} tier={props.tier} onTier={props.onTier} think={props.think} />}
+          {props.tiers && props.tier && props.onTier && <TierPicker tiers={props.tiers} tier={props.tier} onTier={props.onTier} />}
         </div>
         <div className="flex items-center gap-2.5">
           <span className="hidden text-xs whitespace-nowrap text-text-2/80 lg:inline">Enter to send · Shift+Enter for a new line</span>
