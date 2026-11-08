@@ -4,7 +4,7 @@ import { EXPLORER_TX, YOCTO } from "../near/config";
 import { WALLET } from "../near/network";
 import { onNetwork } from "../near/network-server";
 import { tryView, txStatus, viewAccount } from "../near/rpc";
-import { ftTransfer, ftTransferCall, nearDeposit, storageDeposit, type FunctionCallAction, type WalletTx } from "../near/tx";
+import { ftTransfer, ftTransferCall, nearDeposit, nearWithdraw, storageDeposit, type FunctionCallAction, type WalletTx } from "../near/tx";
 import { access } from "../gate/access";
 import { storedReport } from "../risk/report";
 import { HttpError, ref, type SourceRef } from "../sources/http";
@@ -117,8 +117,17 @@ export type SwapView = {
   tx_hash: string | null;
   tx_url: string | null;
   deposit: DepositInfo | null;
+  /**
+   * NEAR Intents pays NEAR out as wNEAR. Once such a swap is done, the wNEAR it delivered, which the
+   * card offers to unwrap into native NEAR; null when there is nothing to unwrap.
+   */
+  unwrap: string | null;
   result: {
     amount_out?: string | null;
+    /** Raw units of what was delivered, when the upstream says. */
+    amount_out_raw?: string | null;
+    /** The unwrap transaction, once signed ("done" when the wallet gave no hash). */
+    unwrapped?: string | null;
     refunded?: string | null;
     reason?: string | null;
     upstream?: string;
@@ -284,6 +293,7 @@ async function priced(r: Resolved, account: string | null): Promise<SwapQuote> {
           r.pay === "wallet"
             ? "Plus NEAR gas and, if needed, token registration (under 0.01 NEAR)."
             : `Plus the ${chainName(from.chain)} network fee for your transfer.`,
+          ...(to.native ? ["NEAR arrives as wNEAR; the card then unwraps it to NEAR in one tap."] : []),
         ],
         pool_ids: null,
         time_estimate_s: q.data.quote.timeEstimate ?? null,
@@ -481,6 +491,10 @@ function view(row: Row): SwapView {
             refund_to: proposal.refund_to ?? null,
           }
         : null,
+    unwrap:
+      row.status === "success" && unwrappable(row) && !result?.unwrapped
+        ? `${fromRaw(result?.amount_out_raw ?? proposal.to.raw, 24)} wNEAR`
+        : null,
     result,
     updated_at: new Date(row.updated_at).toISOString(),
   };
@@ -676,6 +690,7 @@ async function refreshSwapOn(id: string, account: string): Promise<SwapView> {
         result: JSON.stringify({
           upstream: s.status,
           amount_out: d?.amountOutFormatted ?? null,
+          amount_out_raw: d?.amountOut ?? null,
           refunded: d?.refundedAmount && d.refundedAmount !== "0" ? d.refundedAmountFormatted : null,
           reason:
             d?.refundReason ??
@@ -738,6 +753,39 @@ async function rheaOutcome(row: Row): Promise<Partial<Row> | null> {
     status: "success",
     result: JSON.stringify({ amount_out: received !== null && decimals !== undefined ? fromRaw(received, decimals) : null }),
   };
+}
+
+// ─── Unwrap NEAR paid out as wNEAR ──────────────────────────────────────────
+
+/** An intents swap into native NEAR to the signer: it arrives as wNEAR. Rhea's pool already pays native NEAR. */
+function unwrappable(row: Row): boolean {
+  const { proposal } = stored(row);
+  return row.route === "intents" && proposal.to.chain === "near" && proposal.to.token === null && proposal.to.asset === `nep141:${WNEAR}`;
+}
+
+/**
+ * The transaction that unwraps what a finished swap delivered: the delivered amount, or less when
+ * the wallet holds less wNEAR now.
+ */
+export function unwrapSwap(id: string, account: string): Promise<{ swap: SwapView; txs: WalletTx[] }> {
+  return onNetwork(WALLET, async () => {
+    const row = load(id, account);
+    const result = row.result ? (JSON.parse(row.result) as NonNullable<SwapView["result"]>) : null;
+    if (row.status !== "success" || !unwrappable(row) || result?.unwrapped) throw new SwapError("This swap has nothing to unwrap.");
+    const held = await ftBalance(WNEAR, account);
+    const delivered = BigInt(result?.amount_out_raw ?? stored(row).proposal.to.raw);
+    const amount = held < delivered ? held : delivered;
+    if (amount <= 0n) throw new SwapError("There is no wNEAR left in this wallet to unwrap.");
+    return { swap: view(row), txs: [{ receiverId: WNEAR, actions: [nearWithdraw(amount.toString())] }] };
+  });
+}
+
+/** The wallet signed the unwrap. */
+export function unwrappedSwap(id: string, account: string, txHash: string | null): SwapView {
+  const row = load(id, account);
+  const result = row.result ? (JSON.parse(row.result) as NonNullable<SwapView["result"]>) : {};
+  update(id, { result: JSON.stringify({ ...result, unwrapped: txHash ?? "done" }) });
+  return view(load(id, account));
 }
 
 export function getSwap(id: string, account: string): SwapView {

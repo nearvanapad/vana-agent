@@ -459,6 +459,39 @@ function DepositPanel({ swap, onUpdate }: { swap: SwapView; onUpdate: (s: SwapVi
   );
 }
 
+/** NEAR Intents paid NEAR out as wNEAR: one transaction turns it into native NEAR. */
+function Unwrap({ swap }: { swap: SwapView }) {
+  const qc = useQueryClient();
+  const wallet = useWallet();
+  const run = useMutation({
+    mutationFn: async () => {
+      const { txs } = await post<{ swap: SwapView; txs: WalletTx[] }>(swap.id, { action: "unwrap" });
+      let outcomes: Outcome[];
+      try {
+        outcomes = (await sendTransactions(txs)) as Outcome[];
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new Error(/reject|cancel|closed|denied/i.test(msg) ? "You closed the wallet. Your wNEAR is still there." : `The wallet said: ${msg}`);
+      }
+      const last = outcomes[outcomes.length - 1];
+      if (last && failedOnChain(last as never)) throw new Error("The unwrap failed on chain. Your wNEAR is still there.");
+      const r = await post<{ swap: SwapView }>(swap.id, { action: "unwrapped", txHash: hashOf(last) });
+      qc.setQueryData(["swap", swap.id], r.swap);
+    },
+  });
+  if (wallet.account !== swap.account) {
+    return <p className="mt-1.5 text-xs text-text-2">Connect {shortAccount(swap.account)} to unwrap it into NEAR.</p>;
+  }
+  return (
+    <div className="mt-2">
+      <button type="button" disabled={run.isPending} onClick={() => run.mutate()} className={clsx(QUIET, "gap-2 rounded-well px-3 py-[7px] text-sm text-text")}>
+        {run.isPending ? <Loader2 size={14} className="animate-spin" /> : <Wallet size={14} />} Unwrap {swap.unwrap} to NEAR
+      </button>
+      {run.error && <p className="mt-1.5 text-sm text-bad">{run.error.message}</p>}
+    </div>
+  );
+}
+
 function Progress({ swap, proposal }: { swap: SwapView; proposal: Proposal }) {
   const r = swap.result;
   const byDeposit = proposal.pay === "deposit";
@@ -491,11 +524,15 @@ function Progress({ swap, proposal }: { swap: SwapView; proposal: Proposal }) {
     );
   }
   if (swap.status === "success") {
+    const got = r?.amount_out ?? swap.min_out ?? proposal.min_out;
     return (
       <div>
         <p className="flex items-center gap-2 text-sm text-ok">
-          <CheckCircle2 size={15} /> Done. {r?.amount_out ? `You received ${r.amount_out} ${proposal.to.symbol}.` : `At least ${swap.min_out ?? proposal.min_out} ${proposal.to.symbol} sent.`}
+          <CheckCircle2 size={15} /> Done.{" "}
+          {r?.amount_out ? `You received ${got} ${proposal.to.symbol}` : `At least ${got} ${proposal.to.symbol} sent`}
+          {swap.unwrap ? " as wNEAR." : r?.unwrapped ? ", unwrapped to NEAR." : "."}
         </p>
+        {swap.unwrap && <Unwrap swap={swap} />}
         {links}
       </div>
     );

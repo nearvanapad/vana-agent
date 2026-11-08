@@ -30,6 +30,9 @@ export const storageDeposit = (account: string, deposit: string) =>
 /** Wraps native NEAR into wNEAR (`wrap.near`). */
 export const nearDeposit = (amount: string) => call("near_deposit", {}, GAS.wrap, amount);
 
+/** Unwraps wNEAR back into native NEAR. */
+export const nearWithdraw = (amount: string) => call("near_withdraw", { amount }, GAS.wrap, ONE_YOCTO);
+
 export const ftTransfer = (receiver: string, amount: string) =>
   call("ft_transfer", { receiver_id: receiver, amount, memo: null }, GAS.transfer, ONE_YOCTO);
 
