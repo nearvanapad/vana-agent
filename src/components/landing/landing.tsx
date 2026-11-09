@@ -299,7 +299,7 @@ function Chapter({
   const afterIntro = count(title) * 0.08 + count(body) * 0.03 + 0.4;
   return (
     <section ref={secRef} id={label} aria-label={RAIL[index]} className="relative" style={{ height: `${HEIGHTS[index]}vh`, "--p": 0, "--pp": 0.5 } as CSSProperties}>
-      <div className="sticky top-0 flex h-screen items-center overflow-hidden py-16">
+      <div className="sticky top-0 flex h-svh items-center overflow-hidden py-16">
         <div
           data-fit="full"
           className="relative mx-auto grid w-full max-w-[1520px] origin-center grid-cols-[repeat(auto-fit,minmax(min(100%,370px),1fr))] items-center gap-x-10 gap-y-7 px-[4vw] py-3"
@@ -582,10 +582,10 @@ export function Landing() {
 
       {/* 00 · Hero */}
       <section ref={sec(0)} aria-label="Start" className="relative" style={{ height: `${HEIGHTS[0]}vh`, "--p": 0, "--pp": 0 } as CSSProperties}>
-        <div className="sticky top-0 flex h-screen items-center justify-center overflow-hidden py-16">
+        <div className="sticky top-0 flex h-svh items-center justify-center overflow-hidden py-16">
           <div data-fit="1" className="relative z-[1] origin-center">
             <div className="flex flex-col items-center gap-5 px-6 py-4 text-center" style={{ transform: "translateY(calc(var(--p) * -90px))" }}>
-              <div ref={ph(0)} className="aspect-square w-[min(260px,32vh,56vw)]">
+              <div ref={ph(0)} className="aspect-square w-[min(260px,32svh,56vw)]">
                 {vanaAt(0)}
               </div>
               {/* The copy fades as you scroll on; Vana stays, since the first vine grows from her. */}
@@ -733,7 +733,7 @@ export function Landing() {
             <span className="rounded-full border border-line px-2 py-px text-[11px] text-text-2">Demo token</span>
             <span className="ml-auto text-xs text-text-2">First 12 buyers</span>
           </div>
-          <div className="relative mx-auto my-1 aspect-square w-full max-w-[min(330px,40vh)]">
+          <div className="relative mx-auto my-1 aspect-square w-full max-w-[min(330px,40svh)]">
             <svg viewBox="0 0 100 100" className="absolute inset-0 size-full overflow-visible" aria-hidden>
               <circle cx="50" cy="50" r="40" fill="none" stroke="var(--line)" strokeWidth="0.4" strokeDasharray="1 1.5" />
               {(
