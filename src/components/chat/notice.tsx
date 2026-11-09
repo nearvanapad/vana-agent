@@ -2,13 +2,16 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { clsx } from "clsx";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSession } from "@/components/session/use-session";
 import { NEARVANA_INTRO, NearvanaLink } from "@/components/nearvana/nearvana";
 import { EYEBROW, STICKER } from "@/components/ui/styles";
+import { WALLET } from "@/lib/near/network";
 import { Mascot } from "@/components/vana/mascot";
 
-const SEEN = "vana:notice-seen";
+/** How many page loads have shown the notice; it stops after MAX_VIEWS. */
+const VIEWS = "vana:notice-views";
+const MAX_VIEWS = 3;
 
 function Icon({ children }: { children: ReactNode }) {
   return (
@@ -19,6 +22,16 @@ function Icon({ children }: { children: ReactNode }) {
 }
 
 const POINTS: { icon: ReactNode; text: string }[] = [
+  {
+    icon: (
+      <Icon>
+        <circle cx="12" cy="12" r="10" />
+        <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20" />
+        <path d="M2 12h20" />
+      </Icon>
+    ),
+    text: `Checks any NEAR token, mainnet or testnet.${WALLET.id === "testnet" ? " Wallet and swaps run on testnet for now." : ""}`,
+  },
   {
     icon: (
       <Icon>
@@ -50,27 +63,37 @@ const POINTS: { icon: ReactNode; text: string }[] = [
   },
 ];
 
-/** The first time this browser opens the app: what VANA does and doesn't do. Closed by "Got it" or Escape. */
+/**
+ * The first MAX_VIEWS times this browser opens the app: what VANA does and doesn't do.
+ * "Got it" or Escape close it for this page load only.
+ */
 export function Notice() {
   const session = useSession();
-  const [seen, setSeen] = useState(true);
+  const [open, setOpen] = useState(false);
+  const views = useRef<number | null>(null);
   useEffect(() => {
+    let n = 0;
     try {
-      setSeen(localStorage.getItem(SEEN) === "1");
-    } catch {
-      setSeen(false);
-    }
-  }, []);
-  const dismiss = () => {
-    try {
-      localStorage.setItem(SEEN, "1");
+      n = Number(localStorage.getItem(VIEWS)) || 0;
     } catch {}
-    setSeen(true);
-  };
+    views.current = n;
+    setOpen(n < MAX_VIEWS);
+  }, []);
+
+  // Counts a view once it is actually on screen, once per page load.
+  const shown = session.ready && open;
+  const counted = useRef(false);
+  useEffect(() => {
+    if (!shown || counted.current || views.current === null) return;
+    counted.current = true;
+    try {
+      localStorage.setItem(VIEWS, String(views.current + 1));
+    } catch {}
+  }, [shown]);
 
   return (
     // Waits for the session so it opens over the screen the visitor will actually see.
-    <Dialog.Root open={session.ready && !seen} onOpenChange={(o) => !o && dismiss()}>
+    <Dialog.Root open={shown} onOpenChange={(o) => !o && setOpen(false)}>
       <Dialog.Portal>
         {/* The scrim centres the card, so the card's pop-in transform has nothing to fight. */}
         <Dialog.Overlay className="n-fade fixed inset-0 z-[60] grid place-items-center bg-[rgb(10_22_18/0.72)] p-4 backdrop-blur-[4px]">
