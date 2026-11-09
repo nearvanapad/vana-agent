@@ -1,6 +1,6 @@
 import { createHash, createPublicKey, randomBytes, verify } from "node:crypto";
 import { kv } from "../db";
-import { WALLET } from "../near/network";
+import type { Network } from "../near/network";
 import { onNetwork } from "../near/network-server";
 import { viewAccessKeys } from "../near/rpc";
 
@@ -30,7 +30,7 @@ export type SignedMessage = {
 
 export class SignInError extends Error {}
 
-export async function verifySignIn(s: SignedMessage, recipient: string): Promise<string> {
+export async function verifySignIn(s: SignedMessage, recipient: string, network: Network): Promise<string> {
   const stored = kv.get<string>(`nep413:${s.nonce}`);
   if (stored !== recipient) throw new SignInError("Sign-in request expired. Try again.");
   // One use only.
@@ -46,10 +46,10 @@ export async function verifySignIn(s: SignedMessage, recipient: string): Promise
   if (!ok) throw new SignInError("The signature does not match.");
 
   const account = s.accountId.trim().toLowerCase();
-  // The wallet signs on one network: its keys are read there.
-  const keys = await onNetwork(WALLET, () => viewAccessKeys(account)).catch(() => []);
+  // The wallet signs on the network the visitor picked: its keys are read there.
+  const keys = await onNetwork(network, () => viewAccessKeys(account)).catch(() => []);
   const full = keys.some((k) => k.public_key === s.publicKey && k.access_key.permission === "FullAccess");
-  if (!full) throw new SignInError(`That key is not a full-access key of ${account}.`);
+  if (!full) throw new SignInError(`That key is not a full-access key of ${account} on NEAR ${network.id}.`);
   return account;
 }
 

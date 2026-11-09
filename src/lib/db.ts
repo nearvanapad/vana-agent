@@ -70,6 +70,16 @@ const MIGRATIONS = [
      PRIMARY KEY (token, account)
    );
    CREATE INDEX early_buys_account ON early_buys (account);`,
+  // The network a session signed in on and a swap runs on, now that visitors pick one. Rows from
+  // before were on the build's network (NULL). `usage` counts chat messages per IP and account per day.
+  `ALTER TABLE sessions ADD COLUMN network TEXT;
+   ALTER TABLE swaps ADD COLUMN network TEXT;
+   CREATE TABLE usage (
+     key TEXT NOT NULL,
+     day TEXT NOT NULL,
+     n INTEGER NOT NULL,
+     PRIMARY KEY (key, day)
+   );`,
 ];
 
 let db: Database.Database | null = null;

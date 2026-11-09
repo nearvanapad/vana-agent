@@ -25,7 +25,8 @@ async function once(): Promise<void> {
     ["nearvana launches", () => onNetwork(TESTNET, nearvanaLaunches)],
     ["sniper index", () => onNetwork(MAINNET, warmIndex)],
     ["testnet sniper index", () => onNetwork(TESTNET, warmIndex)],
-    ["swap tokens", () => swapTokens()],
+    ["mainnet swap tokens", () => swapTokens(MAINNET)],
+    ["testnet swap tokens", () => swapTokens(TESTNET)],
   ];
   const results = await Promise.allSettled(jobs.map(([, run]) => run()));
   const failed = jobs.filter((_, i) => results[i]!.status === "rejected").map(([name]) => name);

@@ -1,6 +1,7 @@
 /**
  * The two NEAR networks the risk check can read. Accounts ending in `.testnet` are read from
- * testnet, everything else from mainnet. The wallet signs, and swaps run, on one network: `WALLET`.
+ * testnet, everything else from mainnet. The wallet signs, and swaps run, on the network the visitor
+ * picked: `WALLET` in the browser, `Session.network` on the server.
  *
  * Server code runs a request inside one network (see `network-server.ts`); code that runs in
  * the browser, or outside such a request, gets mainnet.
@@ -62,10 +63,36 @@ export const TESTNET: Network = {
 };
 
 /**
- * The network the wallet signs on and swaps run on, set at build time with NEXT_PUBLIC_NEAR_NETWORK.
- * Testnet by default: swaps there go through Rhea's testnet pools (NEAR Intents is mainnet only).
+ * The network the wallet signs on until the visitor picks one, set at build time with
+ * NEXT_PUBLIC_NEAR_NETWORK. Testnet by default: swaps there go through Rhea's testnet pools
+ * (NEAR Intents is mainnet only).
  */
-export const WALLET: Network = process.env.NEXT_PUBLIC_NEAR_NETWORK === "mainnet" ? MAINNET : TESTNET;
+export const DEFAULT_WALLET: Network = process.env.NEXT_PUBLIC_NEAR_NETWORK === "mainnet" ? MAINNET : TESTNET;
+
+/** The visitor's pick, in a cookie the server reads too. Switching reloads the app. */
+export const NET_COOKIE = "vana_net";
+
+/** A network by id; anything else is null. */
+export const networkById = (id: string | null | undefined): Network | null => (id === "mainnet" ? MAINNET : id === "testnet" ? TESTNET : null);
+
+function pickedInBrowser(): Network | null {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(new RegExp(`(?:^|; )${NET_COOKIE}=([^;]*)`));
+  return networkById(m?.[1]);
+}
+
+/**
+ * The network the wallet signs on and swaps run on, in the browser: the visitor's pick, else the
+ * default. The app renders only in the browser, and switching reloads it, so this holds for a page
+ * load. Server code takes the network from the session instead (`Session.network`).
+ */
+export const WALLET: Network = pickedInBrowser() ?? DEFAULT_WALLET;
+
+/** Saves the pick and reloads, so every module starts again on the new network. */
+export function switchWallet(id: Network["id"]) {
+  document.cookie = `${NET_COOKIE}=${id}; path=/; max-age=${365 * 24 * 3600}; samesite=lax${location.protocol === "https:" ? "; secure" : ""}`;
+  location.reload();
+}
 
 /** The network an account lives on, from its name. */
 export const networkOf = (account: string): Network => (/\.testnet$/.test(account.trim().toLowerCase()) ? TESTNET : MAINNET);

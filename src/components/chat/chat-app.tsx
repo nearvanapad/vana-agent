@@ -11,7 +11,7 @@ import { ThemeToggle } from "@/components/theme/theme-toggle";
 import { useUnlocked } from "@/components/gate/gate-card";
 import { STICKER } from "@/components/ui/styles";
 import { WalletPanel } from "@/components/wallet/connect-button";
-import { WALLET } from "@/lib/near/network";
+import { NetworkSwitch } from "@/components/wallet/network-switch";
 import Image from "next/image";
 import Link from "next/link";
 import { PaneProvider } from "@/components/pane/pane-context";
@@ -199,7 +199,7 @@ export function ChatApp() {
               <span className="truncate text-[15px] font-medium" title={title}>
                 {title}
               </span>
-              <span className="shrink-0 rounded-full border border-line px-2 py-px text-[11px] text-text-2">{WALLET.id}</span>
+              <NetworkSwitch />
             </div>
             <div className="flex items-center gap-2">
               <PaneTabs />

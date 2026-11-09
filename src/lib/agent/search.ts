@@ -8,7 +8,7 @@ import { normalizeToken } from "../risk/report";
 import { ref, type SourceRef } from "../sources/http";
 import { swapAssets } from "../sources/intents";
 import { poolCount, prices, whitelist } from "../sources/rhea";
-import { swapTokens } from "../swap/tokens";
+import { swapTokensIfReady } from "../swap/tokens";
 import { stranger } from "./guard";
 
 export type TokenMatch = {
@@ -43,7 +43,7 @@ export async function searchToken(query: string): Promise<{ query: string; match
     swapAssets().catch(() => null),
     onNetwork(MAINNET, nearlyLaunches).catch(() => null),
     onNetwork(TESTNET, nearvana.allLaunches).catch(() => null),
-    swapTokens().catch(() => null),
+    Promise.all([swapTokensIfReady(MAINNET), swapTokensIfReady(TESTNET)]).catch(() => [null, null] as const),
   ]);
   const sources: SourceRef[] = [];
   if (px) sources.push(ref(px.source, px.url, new Date(px.as_of)));
@@ -75,8 +75,8 @@ export async function searchToken(query: string): Promise<{ query: string; match
     if (a.symbol.toLowerCase() === q) consider(token, a.symbol, a.price, 4);
   }
 
-  // Tokens with a Rhea pool on the swap network: the only list testnet has.
-  for (const t of swappable?.tokens ?? []) {
+  // Tokens with a Rhea pool on either network: the only list testnet has.
+  for (const t of swappable.flatMap((l) => l?.tokens ?? [])) {
     const sym = t.symbol.toLowerCase();
     if (t.token === q) consider(t.token, t.symbol, t.price_usd, 5, t.launchpad);
     else if (sym === q) consider(t.token, t.symbol, t.price_usd, 4, t.launchpad);

@@ -12,7 +12,7 @@ const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 0 
 
 /**
  * The wallet at the foot of the sidebar: connect it, sign in with it (NEP-413) so chats are kept
- * under the account, and see whether its NVANA unlocks the chat. The launchpad link sits on top.
+ * under the account, and see whether it unlocks the chat (free for now; NVANA when the gate asks). The launchpad link sits on top.
  */
 export function WalletPanel() {
   const { account, ready, connecting, error, connect, disconnect } = useWallet();
@@ -47,9 +47,15 @@ export function WalletPanel() {
         <div className="flex items-center justify-between gap-2 rounded-well border border-line bg-surface px-3 py-2.5">
           <div className="min-w-0">
             <div className={clsx(EYEBROW, "font-normal text-text-2")}>Access</div>
-            <div className="truncate font-mono text-[13px] font-semibold">
-              {a.balance === null ? "—" : fmt(a.balance)} {a.symbol}
-            </div>
+            {a.min > 0 ? (
+              <div className="truncate font-mono text-[13px] font-semibold">
+                {a.balance === null ? "—" : fmt(a.balance)} {a.symbol}
+              </div>
+            ) : (
+              <div className="text-[13px] font-semibold">
+                Free for now <span className="font-normal text-text-2">· no {a.symbol} needed</span>
+              </div>
+            )}
           </div>
           {a.ok ? (
             <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ok/60 px-2 py-0.5 text-xs font-semibold whitespace-nowrap text-ok">✓ Unlocked</span>

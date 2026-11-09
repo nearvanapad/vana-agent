@@ -29,7 +29,7 @@ export async function POST(req: Request) {
   const { conversationId, ...input } = body.data;
   const conv = conversationId && ownsConversation(conversationId, ownerOf(s)) ? conversationId : null;
   try {
-    return Response.json(await proposeSwap(input, s.account, conv));
+    return Response.json(await proposeSwap(input, s.account, conv, s.network));
   } catch (e) {
     if (e instanceof SwapError || e instanceof Error) return Response.json({ error: e.message }, { status: 422 });
     throw e;

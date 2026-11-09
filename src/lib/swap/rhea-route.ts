@@ -1,7 +1,7 @@
 import { tryView } from "../near/rpc";
 import { mapLimit } from "../sources/http";
 import { dcl, poolsFor, type Pool } from "../sources/rhea";
-import { WNEAR } from "./assets";
+import { wnear } from "./assets";
 
 /**
  * Swaps on Rhea's concentrated-liquidity (DCL) pools, for NEAR tokens NEAR Intents doesn't list
@@ -35,9 +35,10 @@ export async function quotePath(pool_ids: string[], input: string, output: strin
 export async function bestRoute(input: string, output: string, amount: bigint): Promise<RheaRoute | null> {
   const [ins, outs] = await Promise.all([dclPools(input), dclPools(output)]);
   const paths: string[][] = ins.filter((p) => p.tokens.includes(output)).map((p) => [p.id]);
-  if (input !== WNEAR && output !== WNEAR) {
-    const first = ins.filter((p) => p.tokens.includes(WNEAR)).slice(0, 4);
-    const second = outs.filter((p) => p.tokens.includes(WNEAR)).slice(0, 4);
+  const w = wnear();
+  if (input !== w && output !== w) {
+    const first = ins.filter((p) => p.tokens.includes(w)).slice(0, 4);
+    const second = outs.filter((p) => p.tokens.includes(w)).slice(0, 4);
     for (const a of first) for (const b of second) paths.push([a.id, b.id]);
   }
   if (!paths.length) return null;

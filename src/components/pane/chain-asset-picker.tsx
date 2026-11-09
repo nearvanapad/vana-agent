@@ -16,7 +16,7 @@ export function useCrossAssets(enabled = true) {
     enabled,
     queryKey: ["cross-assets", WALLET.id],
     queryFn: async (): Promise<CrossAssets> => {
-      const r = await fetch("/api/swap/assets");
+      const r = await fetch(`/api/swap/assets?network=${WALLET.id}`);
       if (!r.ok) throw new Error(`Asset list failed (${r.status})`);
       return (await r.json()) as CrossAssets;
     },

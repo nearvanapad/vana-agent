@@ -1,4 +1,4 @@
-import { ChatApp } from "@/components/chat/chat-app";
+import { ChatAppClient } from "./client";
 import { pageMetadata } from "@/lib/share/metadata";
 
 export const generateMetadata = () =>
@@ -9,5 +9,5 @@ export const generateMetadata = () =>
   });
 
 export default function App() {
-  return <ChatApp />;
+  return <ChatAppClient />;
 }

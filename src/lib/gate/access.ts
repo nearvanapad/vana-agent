@@ -3,7 +3,7 @@ import { onNetwork } from "../near/network-server";
 import { tryView } from "../near/rpc";
 import { GATE_MIN, GATE_SYMBOL, GATE_TOKEN, type Access } from "./config";
 
-/** GATE_TOKEN and GATE_MIN override the defaults on the server; GATE_MIN=0 turns the gate off. */
+/** GATE_TOKEN and GATE_MIN override the defaults on the server; GATE_MIN=0 asks only for a signed-in wallet. */
 const token = process.env.GATE_TOKEN || GATE_TOKEN;
 const min = process.env.GATE_MIN !== undefined && process.env.GATE_MIN !== "" ? Number(process.env.GATE_MIN) : GATE_MIN;
 
@@ -27,8 +27,9 @@ async function balanceOf(account: string): Promise<number> {
 /** Whether a session's account may use the chat and token checks. `fresh` skips the 30s cache. */
 export async function access(account: string | null, opts: { fresh?: boolean } = {}): Promise<Access> {
   const base = { min, token, symbol: GATE_SYMBOL };
-  if (!(min > 0)) return { ok: true, reason: null, balance: null, ...base };
   if (!account) return { ok: false, reason: "guest", balance: null, ...base };
+  // No holding needed: any signed-in wallet may chat and check tokens.
+  if (!(min > 0)) return { ok: true, reason: null, balance: null, ...base };
   const hit = seen.get(account);
   let balance: number;
   if (hit && !opts.fresh && Date.now() - hit.at < TTL) balance = hit.balance;
@@ -50,7 +51,9 @@ export async function access(account: string | null, opts: { fresh?: boolean } =
 export function denied(a: Access): Response {
   const error =
     a.reason === "guest"
-      ? `Connect your wallet and sign in to use VANA. It is for holders of ${a.min.toLocaleString("en-US")} ${a.symbol} or more.`
+      ? a.min > 0
+        ? `Connect your wallet and sign in to use VANA. It is for holders of ${a.min.toLocaleString("en-US")} ${a.symbol} or more.`
+        : "Connect your wallet and sign in to use VANA."
       : a.reason === "unknown"
         ? `Couldn't read your ${a.symbol} balance. Try again in a moment.`
         : `VANA is for holders of ${a.min.toLocaleString("en-US")} ${a.symbol} or more. This wallet holds ${(a.balance ?? 0).toLocaleString("en-US")}.`;

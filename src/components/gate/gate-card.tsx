@@ -20,8 +20,9 @@ export function useUnlocked(): boolean | null {
 }
 
 /**
- * Stands in for the chat and the token checks until the wallet is connected, signed in and holds
- * enough NVANA. Walks through the three steps, and offers the swap to get the tokens.
+ * Stands in for the chat and the token checks until the wallet is connected, signed in and, when
+ * the gate asks for a holding (min above 0), holds enough NVANA. Walks through the steps, and offers
+ * the swap to get the tokens.
  */
 export function GateCard({ compact }: { compact?: boolean }) {
   const wallet = useWallet();
@@ -33,21 +34,27 @@ export function GateCard({ compact }: { compact?: boolean }) {
   const token = a?.token ?? GATE_TOKEN;
   const connected = Boolean(wallet.account);
   const signedIn = Boolean(session.account && session.account === wallet.account);
-  const swappable = networkOf(token).id === WALLET.id;
+  // No NVANA needed for now (min 0): signing in is enough.
+  const hold = min > 0;
+  const swappable = hold && networkOf(token).id === WALLET.id;
 
   const getTokens = () => {
     pane.dispatch({ t: "form", form: { from: "NEAR", to: token, mode: "swap" } });
     pane.dispatch({ t: "open", tab: "swap" });
   };
 
-  const steps = [
+  const steps: { done: boolean; label: string; note?: string | null }[] = [
     { done: connected, label: "Connect your wallet" },
     { done: signedIn, label: "Sign in with it (a signature, no transaction)" },
-    {
-      done: Boolean(a?.ok),
-      label: `Hold ${fmt(min)} ${symbol}${networkOf(token).id === "testnet" ? " (testnet)" : ""}`,
-      note: signedIn && a?.balance !== null && a?.balance !== undefined ? `This wallet holds ${fmt(a.balance)}.` : null,
-    },
+    ...(hold
+      ? [
+          {
+            done: Boolean(a?.ok),
+            label: `Hold ${fmt(min)} ${symbol}${networkOf(token).id === "testnet" ? " (testnet)" : ""}`,
+            note: signedIn && a?.balance !== null && a?.balance !== undefined ? `This wallet holds ${fmt(a.balance)}.` : null,
+          },
+        ]
+      : []),
   ];
 
   const get = swappable && (
@@ -83,9 +90,13 @@ export function GateCard({ compact }: { compact?: boolean }) {
         <Lock size={22} />
       </span>
       <div className="flex flex-col gap-1.5">
-        <h2 className={clsx("font-display leading-[1.15]", compact ? "text-xl" : "text-[clamp(22px,4.2vw,30px)]")}>VANA is for {symbol} holders</h2>
+        <h2 className={clsx("font-display leading-[1.15]", compact ? "text-xl" : "text-[clamp(22px,4.2vw,30px)]")}>
+          {hold ? `VANA is for ${symbol} holders` : "Sign in to use VANA"}
+        </h2>
         <p className="text-sm text-pretty text-text-2">
-          Chatting with VANA and checking tokens need a signed-in wallet holding {fmt(min)} {symbol} or more. Swaps are open to everyone.
+          {hold
+            ? `Chatting with VANA and checking tokens need a signed-in wallet holding ${fmt(min)} ${symbol} or more. Swaps are open to everyone.`
+            : `Chatting with VANA and checking tokens need a signed-in wallet. No ${symbol} needed for now. Swaps are open to everyone.`}
         </p>
       </div>
       <ol className="flex w-full flex-col rounded-card border border-line bg-surface p-1.5 text-left text-sm">

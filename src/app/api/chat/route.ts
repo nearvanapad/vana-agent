@@ -16,7 +16,8 @@ import { instructions } from "@/lib/agent/prompt";
 import { buildTools } from "@/lib/agent/tools";
 import { ownerOf, readSession } from "@/lib/auth/session";
 import { CONVERSATION_ID, ensureConversation, loadMessages, NotYours, saveMessages, titleFrom } from "@/lib/chat/store";
-import { allow } from "@/lib/chat/rate-limit";
+import { allow, allowToday, ipOf } from "@/lib/chat/rate-limit";
+import { CHAT_PER_DAY } from "@/lib/chat/limits";
 import { access, denied } from "@/lib/gate/access";
 
 const Id = z.string().max(120).regex(/^[A-Za-z0-9._:-]+$/);
@@ -54,6 +55,10 @@ export async function POST(req: Request) {
 
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) return Response.json({ error: "Bad request." }, { status: 400 });
+  // Chat is free for any signed-in wallet for now, so each IP and each wallet gets a daily budget.
+  if (!allowToday([`ip:${ipOf(req)}`, ...(s.account ? [`acct:${s.account}`] : [])])) {
+    return Response.json({ error: `You've reached today's limit of ${CHAT_PER_DAY} messages. It resets at 00:00 UTC.` }, { status: 429 });
+  }
   const { id, think, pane, tier } = body.data;
   const message = body.data.message as unknown as UIMessage;
   const text = titleFrom(message);
@@ -69,7 +74,7 @@ export async function POST(req: Request) {
   }
 
   const guard = new Guard();
-  const tools = buildTools(guard, { account: s.account, conversationId: id });
+  const tools = buildTools(guard, { account: s.account, conversationId: id, network: s.network });
   // A resent message (retry) replaces the stored copy and everything after it.
   const stored = loadMessages(id);
   const at = stored.findIndex((m) => m.id === message.id);
@@ -95,7 +100,7 @@ export async function POST(req: Request) {
   whole.current = llm.tier === "private";
   const result = streamText({
     model: llm.model,
-    instructions: instructions({ account: s.account, now: new Date(), canSwap: Boolean(s.account), pane }),
+    instructions: instructions({ account: s.account, now: new Date(), canSwap: Boolean(s.account), pane, network: s.network.id }),
     messages: await convertToModelMessages(messages.slice(-HISTORY), { tools, ignoreIncompleteToolCalls: true }),
     tools,
     stopWhen: isStepCount(8),

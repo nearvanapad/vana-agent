@@ -1,4 +1,4 @@
-import { explorer } from "../near/network";
+import { explorer, type Network } from "../near/network";
 import { tool, type InferUITools } from "ai";
 import { z } from "zod";
 import { normalizeToken, riskReport } from "../risk/report";
@@ -85,7 +85,12 @@ const swapArgs = z.object({
     .describe("Only when `from` is on another chain: the user's own address on that chain, refunded if the swap can't complete. Only an address the user typed; never make one up."),
 });
 
-export type ToolContext = { account: string | null; conversationId: string | null };
+export type ToolContext = {
+  account: string | null;
+  conversationId: string | null;
+  /** The network the wallet signs on and swaps run on. */
+  network: Network;
+};
 
 export function buildTools(guard: Guard, ctx: ToolContext) {
   return {
@@ -93,7 +98,7 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
       description:
         "Price a swap without committing to anything: route (NEAR Intents or a Rhea pool), amount out, minimum after slippage, fees. Read-only; works for guests.",
       inputSchema: swapArgs,
-      execute: async (args): Promise<SwapQuote> => quoteSwap(args, ctx.account),
+      execute: async (args): Promise<SwapQuote> => quoteSwap(args, ctx.account, ctx.network),
     }),
 
     propose_swap: tool({
@@ -103,7 +108,7 @@ export function buildTools(guard: Guard, ctx: ToolContext) {
       execute: async (args): Promise<Proposal> => {
         guard.assertAction("propose_swap");
         if (!ctx.account) throw new Error("The user must connect and sign in with their wallet before a swap can be proposed.");
-        return proposeSwap(args, ctx.account, ctx.conversationId);
+        return proposeSwap(args, ctx.account, ctx.conversationId, ctx.network);
       },
     }),
 

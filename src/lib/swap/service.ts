@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { getDb } from "../db";
-import { EXPLORER_TX, YOCTO } from "../near/config";
-import { WALLET } from "../near/network";
+import { YOCTO } from "../near/config";
+import { DEFAULT_WALLET, networkById, type Network } from "../near/network";
 import { onNetwork } from "../near/network-server";
 import { tryView, txStatus, viewAccount } from "../near/rpc";
 import { ftTransfer, ftTransferCall, nearDeposit, nearWithdraw, storageDeposit, type FunctionCallAction, type WalletTx } from "../near/tx";
@@ -10,7 +10,7 @@ import { storedReport } from "../risk/report";
 import { HttpError, ref, type SourceRef } from "../sources/http";
 import * as intents from "../sources/intents";
 import { dcl, dclPoolUrl } from "../sources/rhea";
-import { fromRaw, resolveAsset, SwapError, toRaw, WNEAR, type Asset } from "./assets";
+import { fromRaw, resolveAsset, SwapError, toRaw, wnear, type Asset } from "./assets";
 import { addressError, chainName, dryAddress } from "./chains";
 import { bestRoute, quotePath, swapMsg } from "./rhea-route";
 import { swapRisk, type SwapRisk } from "./risk";
@@ -258,9 +258,9 @@ function intentsError(e: unknown): SwapError {
 }
 
 /** A price for the swap. Nothing is stored and nothing can be signed from it. */
-export function quoteSwap(input: SwapInput, account: string | null): Promise<SwapQuote> {
+export function quoteSwap(input: SwapInput, account: string | null, network: Network): Promise<SwapQuote> {
   // Swaps run on the wallet's network.
-  return onNetwork(WALLET, () => quoteSwapOn(input, account));
+  return onNetwork(network, () => quoteSwapOn(input, account));
 }
 
 async function quoteSwapOn(input: SwapInput, account: string | null): Promise<SwapQuote> {
@@ -339,7 +339,7 @@ async function priced(r: Resolved, account: string | null): Promise<SwapQuote> {
 
 async function spendable(a: Asset, account: string): Promise<bigint> {
   if (a.native) {
-    const [acc, wrapped] = await Promise.all([viewAccount(account), ftBalance(WNEAR, account)]);
+    const [acc, wrapped] = await Promise.all([viewAccount(account), ftBalance(wnear(), account)]);
     const free = BigInt(acc.amount) - NEAR_RESERVE;
     return (free > 0n ? free : 0n) + wrapped;
   }
@@ -356,12 +356,12 @@ async function ftBalance(token: string, account: string): Promise<bigint> {
  * (for NVANA holders; it never runs one), and stores the proposal so approval uses exactly what
  * the card showed.
  */
-export function proposeSwap(input: SwapInput, account: string, conversationId: string | null): Promise<Proposal> {
+export function proposeSwap(input: SwapInput, account: string, conversationId: string | null, network: Network): Promise<Proposal> {
   // Swaps run on the wallet's network.
-  return onNetwork(WALLET, () => proposeSwapOn(input, account, conversationId));
+  return onNetwork(network, () => proposeSwapOn(input, account, conversationId, network));
 }
 
-async function proposeSwapOn(input: SwapInput, account: string, conversationId: string | null): Promise<Proposal> {
+async function proposeSwapOn(input: SwapInput, account: string, conversationId: string | null, network: Network): Promise<Proposal> {
   const r = await resolve(input, account, true);
   // A deposit swap is paid on another chain, whose balance we can't read.
   if (r.pay === "wallet") {
@@ -413,10 +413,10 @@ async function proposeSwapOn(input: SwapInput, account: string, conversationId: 
   };
   getDb()
     .prepare(
-      `INSERT INTO swaps (id, account, conversation_id, route, status, proposal, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 'proposed', ?, ?, ?)`,
+      `INSERT INTO swaps (id, account, conversation_id, route, status, proposal, network, created_at, updated_at)
+       VALUES (?, ?, ?, ?, 'proposed', ?, ?, ?, ?)`,
     )
-    .run(id, account, conversationId, q.route, JSON.stringify({ proposal, input }), now, now);
+    .run(id, account, conversationId, q.route, JSON.stringify({ proposal, input }), network.id, now, now);
   return proposal;
 }
 
@@ -432,6 +432,8 @@ type Row = {
   deposit_address: string | null;
   tx_hash: string | null;
   result: string | null;
+  /** NULL for swaps from before visitors picked a network: those ran on the build's. */
+  network: string | null;
   updated_at: number;
 };
 
@@ -440,6 +442,12 @@ function load(id: string, account: string): Row {
   if (!row || row.account !== account) throw new SwapError("Swap not found for this wallet.");
   return row;
 }
+
+/** The network a stored swap runs on. */
+const netOf = (row: Row): Network => networkById(row.network) ?? DEFAULT_WALLET;
+
+/** Runs `fn` on the network the stored swap was proposed on. */
+const onSwap = <T>(id: string, account: string, fn: () => Promise<T>): Promise<T> => onNetwork(netOf(load(id, account)), fn);
 
 const stored = (row: Row) => JSON.parse(row.proposal) as { proposal: Proposal; input: SwapInput };
 
@@ -458,7 +466,7 @@ const storedQuote = (row: Row): StoredQuote | null => (row.quote ? (JSON.parse(r
 const providerOf = (row: Row): intents.Provider => storedQuote(row)?.provider ?? stored(row).proposal.provider ?? "oneclick";
 const depositMemoOf = (row: Row): string | null => storedQuote(row)?.depositMemo ?? null;
 
-function update(id: string, fields: Partial<Omit<Row, "id" | "account" | "route" | "proposal">>) {
+function update(id: string, fields: Partial<Omit<Row, "id" | "account" | "route" | "proposal" | "network">>) {
   const keys = Object.keys(fields) as (keyof typeof fields)[];
   getDb()
     .prepare(`UPDATE swaps SET ${keys.map((k) => `${k} = ?`).join(", ")}, updated_at = ? WHERE id = ?`)
@@ -478,7 +486,7 @@ function view(row: Row): SwapView {
     min_out: quote?.min_out ?? null,
     tx_hash: row.tx_hash,
     // A deposit is a transfer on another chain: link it once the upstream reports where it landed.
-    tx_url: byDeposit ? (result?.origin_tx_url ?? null) : row.tx_hash ? `${EXPLORER_TX}${row.tx_hash}` : null,
+    tx_url: byDeposit ? (result?.origin_tx_url ?? null) : row.tx_hash ? `${netOf(row).explorer}/txns/${row.tx_hash}` : null,
     deposit:
       byDeposit && row.deposit_address && quote?.amount_exact
         ? {
@@ -523,9 +531,9 @@ async function buildTxs(row: Row, r: Resolved, payTo: { depositAddress: string }
   }
   const actions: FunctionCallAction[] = [];
   if (r.from.native) {
-    const reg = await registration(WNEAR, account);
+    const reg = await registration(wnear(), account);
     if (reg) actions.push(reg);
-    const wrapped = reg ? 0n : await ftBalance(WNEAR, account);
+    const wrapped = reg ? 0n : await ftBalance(wnear(), account);
     if (r.raw > wrapped) actions.push(nearDeposit((r.raw - wrapped).toString()));
   }
   if ("depositAddress" in payTo) {
@@ -544,8 +552,7 @@ async function buildTxs(row: Row, r: Resolved, payTo: { depositAddress: string }
  * card showed, and returns the transactions for the wallet.
  */
 export function approveSwap(id: string, account: string): Promise<{ swap: SwapView; txs: WalletTx[] }> {
-  // Swaps run on the wallet's network.
-  return onNetwork(WALLET, () => approveSwapOn(id, account));
+  return onSwap(id, account, () => approveSwapOn(id, account));
 }
 
 async function approveSwapOn(id: string, account: string): Promise<{ swap: SwapView; txs: WalletTx[] }> {
@@ -601,8 +608,7 @@ async function approveSwapOn(id: string, account: string): Promise<{ swap: SwapV
 
 /** The wallet signed and sent the payment. */
 export function submitSwap(id: string, account: string, txHash: string | null): Promise<SwapView> {
-  // Swaps run on the wallet's network.
-  return onNetwork(WALLET, () => submitSwapOn(id, account, txHash));
+  return onSwap(id, account, () => submitSwapOn(id, account, txHash));
 }
 
 async function submitSwapOn(id: string, account: string, txHash: string | null): Promise<SwapView> {
@@ -626,7 +632,7 @@ async function submitSwapOn(id: string, account: string, txHash: string | null):
  * speeds things up: the swap is tracked by its deposit address either way.
  */
 export function sentSwap(id: string, account: string, txHash: string | null): Promise<SwapView> {
-  return onNetwork(WALLET, () => sentSwapOn(id, account, txHash));
+  return onSwap(id, account, () => sentSwapOn(id, account, txHash));
 }
 
 async function sentSwapOn(id: string, account: string, txHash: string | null): Promise<SwapView> {
@@ -657,8 +663,7 @@ const DEPOSIT_GRACE_MS = 30 * 60_000;
 
 /** The swap as it stands, asking 1Click or the chain when it's in flight. */
 export function refreshSwap(id: string, account: string): Promise<SwapView> {
-  // Swaps run on the wallet's network.
-  return onNetwork(WALLET, () => refreshSwapOn(id, account));
+  return onSwap(id, account, () => refreshSwapOn(id, account));
 }
 
 async function refreshSwapOn(id: string, account: string): Promise<SwapView> {
@@ -760,7 +765,7 @@ async function rheaOutcome(row: Row): Promise<Partial<Row> | null> {
 /** An intents swap into native NEAR to the signer: it arrives as wNEAR. Rhea's pool already pays native NEAR. */
 function unwrappable(row: Row): boolean {
   const { proposal } = stored(row);
-  return row.route === "intents" && proposal.to.chain === "near" && proposal.to.token === null && proposal.to.asset === `nep141:${WNEAR}`;
+  return row.route === "intents" && proposal.to.chain === "near" && proposal.to.token === null && proposal.to.asset === `nep141:${netOf(row).wrap}`;
 }
 
 /**
@@ -768,15 +773,15 @@ function unwrappable(row: Row): boolean {
  * the wallet holds less wNEAR now.
  */
 export function unwrapSwap(id: string, account: string): Promise<{ swap: SwapView; txs: WalletTx[] }> {
-  return onNetwork(WALLET, async () => {
+  return onSwap(id, account, async () => {
     const row = load(id, account);
     const result = row.result ? (JSON.parse(row.result) as NonNullable<SwapView["result"]>) : null;
     if (row.status !== "success" || !unwrappable(row) || result?.unwrapped) throw new SwapError("This swap has nothing to unwrap.");
-    const held = await ftBalance(WNEAR, account);
+    const held = await ftBalance(wnear(), account);
     const delivered = BigInt(result?.amount_out_raw ?? stored(row).proposal.to.raw);
     const amount = held < delivered ? held : delivered;
     if (amount <= 0n) throw new SwapError("There is no wNEAR left in this wallet to unwrap.");
-    return { swap: view(row), txs: [{ receiverId: WNEAR, actions: [nearWithdraw(amount.toString())] }] };
+    return { swap: view(row), txs: [{ receiverId: wnear(), actions: [nearWithdraw(amount.toString())] }] };
   });
 }
 

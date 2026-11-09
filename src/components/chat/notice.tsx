@@ -7,10 +7,12 @@ import { useSession } from "@/components/session/use-session";
 import { NEARVANA_INTRO, NearvanaLink } from "@/components/nearvana/nearvana";
 import { EYEBROW, STICKER } from "@/components/ui/styles";
 import { WALLET } from "@/lib/near/network";
+import { GATE_SYMBOL } from "@/lib/gate/config";
+import { CHAT_PER_DAY } from "@/lib/chat/limits";
 import { Mascot } from "@/components/vana/mascot";
 
 /** How many page loads have shown the notice; it stops after MAX_VIEWS. */
-const VIEWS = "vana:notice-views";
+const VIEWS = "vana:notice-views-2";
 const MAX_VIEWS = 3;
 
 function Icon({ children }: { children: ReactNode }) {
@@ -30,7 +32,16 @@ const POINTS: { icon: ReactNode; text: string }[] = [
         <path d="M2 12h20" />
       </Icon>
     ),
-    text: `Checks any NEAR token, mainnet or testnet.${WALLET.id === "testnet" ? " Wallet and swaps run on testnet for now." : ""}`,
+    text: `Checks any NEAR token, mainnet or testnet. Wallet and swaps run on ${WALLET.id}: switch with the badge up top.`,
+  },
+  {
+    icon: (
+      <Icon>
+        <rect x="3" y="11" width="18" height="11" rx="2" />
+        <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+      </Icon>
+    ),
+    text: `Free for now: connect and sign in, no ${GATE_SYMBOL} needed. ${CHAT_PER_DAY} messages a day.`,
   },
   {
     icon: (

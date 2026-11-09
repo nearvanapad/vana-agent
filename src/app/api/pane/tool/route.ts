@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     const a = await access(s.account);
     if (!a.ok) return denied(a);
   }
-  const tools = buildTools(new Guard(), { account: s.account, conversationId: null });
+  const tools = buildTools(new Guard(), { account: s.account, conversationId: null, network: s.network });
   const r = await runTool(tools[body.data.name] as never, body.data.args);
   if (!r.ok) return Response.json({ error: r.error }, { status: 422 });
   return Response.json(r.output);

@@ -1,4 +1,4 @@
-import { WALLET } from "../near/network";
+import { MAINNET, type Network } from "../near/network";
 import { PROVIDER, PROVIDER_LABEL, swapAssets } from "../sources/intents";
 import { chainName, isNearAccount, isSwapChain, SWAP_CHAINS } from "./chains";
 
@@ -27,9 +27,9 @@ const order = (s: string) => {
   return i < 0 ? FIRST.length : i;
 };
 
-export async function crossAssets(): Promise<CrossAssets> {
+export async function crossAssets(network: Network): Promise<CrossAssets> {
   const provider = PROVIDER_LABEL[PROVIDER];
-  if (WALLET.id !== "mainnet") return { available: false, provider, chains: [], reason: "Cross-chain swaps run on mainnet." };
+  if (network.id !== "mainnet") return { available: false, provider, chains: [], reason: "Cross-chain swaps run on mainnet." };
   const list = await swapAssets()
     .then((r) => r.data)
     .catch(() => null);
@@ -43,7 +43,7 @@ export async function crossAssets(): Promise<CrossAssets> {
     if (a.blockchain === "near") {
       // NEAR assets are paid or received by the wallet as plain tokens.
       if (!id.startsWith("nep141:") || !isNearAccount(id.slice(7))) continue;
-      id = id.slice(7) === WALLET.wrap ? "NEAR" : id.slice(7);
+      id = id.slice(7) === MAINNET.wrap ? "NEAR" : id.slice(7);
     }
     const group = by.get(a.blockchain) ?? new Map();
     by.set(a.blockchain, group);

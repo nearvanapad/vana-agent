@@ -29,7 +29,7 @@ export function useSwapTokens() {
   const q = useQuery({
     queryKey: ["swap-tokens", WALLET.id],
     queryFn: async (): Promise<SwapTokenList> => {
-      const r = await fetch("/api/swap/tokens");
+      const r = await fetch(`/api/swap/tokens?network=${WALLET.id}`);
       if (!r.ok) throw new Error(`Token list failed (${r.status})`);
       return (await r.json()) as SwapTokenList;
     },

@@ -222,7 +222,7 @@ export function SwapTab() {
           </div>
           {off && (
             <p className="flex items-start gap-2 text-xs text-warn">
-              <AlertTriangle size={13} className="mt-0.5 shrink-0" /> Swaps run on NEAR {WALLET.id} here. {off} is a {networkOf(off).id} token: it can be checked, not swapped.
+              <AlertTriangle size={13} className="mt-0.5 shrink-0" /> Swaps run on NEAR {WALLET.id} here. {off} is a {networkOf(off).id} token: it can be checked, not swapped. Switch to {networkOf(off).id} with the badge up top to swap it.
             </p>
           )}
           {cross && inward && (

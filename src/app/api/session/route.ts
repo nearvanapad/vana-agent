@@ -30,7 +30,7 @@ export async function POST(req: Request) {
   const s = await ensureSession();
   if (body.data.step === "challenge") return Response.json(challenge(recipientOf(req)));
   try {
-    const account = await verifySignIn(body.data, recipientOf(req));
+    const account = await verifySignIn(body.data, recipientOf(req), s.network);
     const signed = signIn(s, account).account;
     return Response.json({ account: signed, access: await access(signed, { fresh: true }) });
   } catch (e) {

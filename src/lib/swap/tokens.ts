@@ -1,6 +1,6 @@
 import { kv } from "../db";
 import { stranger } from "../agent/guard";
-import { netKey, WALLET } from "../near/network";
+import { net, netKey, type Network } from "../near/network";
 import { onNetwork } from "../near/network-server";
 import { tryView } from "../near/rpc";
 import { factoryOf as hootFactory } from "../risk/launchpad/justhoot";
@@ -13,7 +13,7 @@ import { allPools, prices, whitelist } from "../sources/rhea";
 
 /**
  * Tokens the swap form offers: every token with a live Rhea DCL pool against wNEAR on the
- * network swaps run on, since that is what the Rhea route can trade. Ranked so launchpad and
+ * network the swap runs on, since that is what the Rhea route can trade. Ranked so launchpad and
  * verified tokens come first, then by how much NEAR sits in their deepest pool.
  */
 
@@ -36,7 +36,7 @@ export type SwapTokenList = { network: string; built_at: string; tokens: SwapTok
 type Meta = { symbol: string; decimals: number; icon: string | null } | { bad: true };
 
 /** Pools with less NEAR than this are dust. Mainnet has thousands more tokens, so its floor is higher. */
-const FLOOR = WALLET.id === "mainnet" ? 1 : 0.01;
+const floor = () => (net().id === "mainnet" ? 1 : 0.01);
 const ICON_MAX = 6_000;
 
 const smallIcon = (icon: unknown): string | null => {
@@ -62,12 +62,12 @@ const launchpadOf = (token: string): LaunchpadName | null =>
   isNearvana(token) ? "nearvana" : isNearly(token) ? "nearly" : hootFactory(token) ? "justhoot" : null;
 
 async function build(): Promise<SwapTokenList> {
-  const wrap = WALLET.wrap;
+  const wrap = net().wrap;
   const [{ built_at, pools }, verified, px, assets] = await Promise.all([
     allPools(),
     whitelist().catch(() => new Set<string>()),
     prices().catch(() => null),
-    WALLET.id === "mainnet" ? swapAssets().catch(() => null) : Promise.resolve(null),
+    net().id === "mainnet" ? swapAssets().catch(() => null) : Promise.resolve(null),
   ]);
 
   const depth = new Map<string, number>();
@@ -85,7 +85,8 @@ async function build(): Promise<SwapTokenList> {
   for (const [t, p] of px?.data ?? []) known.set(t, { symbol: p.symbol, decimals: p.decimals });
   for (const a of assets?.data ?? []) if (a.assetId.startsWith("nep141:")) known.set(a.assetId.slice(7), { symbol: a.symbol, decimals: a.decimals });
 
-  const listed = [...depth.entries()].filter(([t, d]) => d >= FLOOR || launchpadOf(t));
+  const min = floor();
+  const listed = [...depth.entries()].filter(([t, d]) => d >= min || launchpadOf(t));
   const rows = await mapLimit(listed, 6, async ([token, depth_near]): Promise<SwapToken | null> => {
     const k = known.get(token);
     const m = await meta(token);
@@ -108,34 +109,52 @@ async function build(): Promise<SwapTokenList> {
       (a, b) =>
         Number(Boolean(b.launchpad)) - Number(Boolean(a.launchpad)) || Number(b.verified) - Number(a.verified) || b.depth_near - a.depth_near,
     );
-  return { network: WALLET.id, built_at, tokens };
+  return { network: net().id, built_at, tokens };
 }
 
 const TTL = 10 * 60_000;
-const KEY = `${WALLET.id}:swap:tokens:v2`;
+const keyOf = (n: Network) => `${n.id}:swap:tokens:v2`;
 type Saved = { at: number; list: SwapTokenList };
 
-let last: Saved | null = null;
-let building: Promise<SwapTokenList> | null = null;
+/** Per network: the last list, and the rebuild in flight. */
+const last = new Map<Network["id"], Saved>();
+const building = new Map<Network["id"], Promise<SwapTokenList>>();
 
-function rebuild(): Promise<SwapTokenList> {
-  building ??= onNetwork(WALLET, build)
-    .then((list) => {
-      last = { at: Date.now(), list };
-      kv.set(KEY, last, null);
-      return list;
-    })
-    .finally(() => (building = null));
-  return building;
+function rebuild(n: Network): Promise<SwapTokenList> {
+  let b = building.get(n.id);
+  if (!b) {
+    b = onNetwork(n, build)
+      .then((list) => {
+        const saved = { at: Date.now(), list };
+        last.set(n.id, saved);
+        kv.set(keyOf(n), saved, null);
+        return list;
+      })
+      .finally(() => building.delete(n.id));
+    building.set(n.id, b);
+  }
+  return b;
 }
 
 /**
  * The swap form's token list. The last one is served at once, even when old; a list older than
  * 10 minutes is rebuilt in the background, since a rebuild can take minutes when the RPC throttles.
  */
-export async function swapTokens(): Promise<SwapTokenList> {
-  last ??= kv.get<Saved>(KEY);
-  if (!last) return rebuild();
-  if (Date.now() - last.at > TTL) rebuild().catch(() => {});
-  return last.list;
+export async function swapTokens(n: Network): Promise<SwapTokenList> {
+  let saved = last.get(n.id);
+  if (!saved) {
+    saved = kv.get<Saved>(keyOf(n)) ?? undefined;
+    if (saved) last.set(n.id, saved);
+  }
+  if (!saved) return rebuild(n);
+  if (Date.now() - saved.at > TTL) rebuild(n).catch(() => {});
+  return saved.list;
+}
+
+/** The list if one is kept, without waiting on a first build (which it starts). */
+export function swapTokensIfReady(n: Network): Promise<SwapTokenList | null> {
+  const saved = last.get(n.id) ?? kv.get<Saved>(keyOf(n));
+  if (saved) return swapTokens(n);
+  rebuild(n).catch(() => {});
+  return Promise.resolve(null);
 }

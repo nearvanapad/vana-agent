@@ -22,7 +22,8 @@ import { NEARVANA_URL } from "@/components/nearvana/nearvana";
 import { EYEBROW, QUIET, STICKER } from "@/components/ui/styles";
 import { Mascot, type Mood } from "@/components/vana/mascot";
 import { stranger } from "@/lib/agent/guard";
-import { GATE_MIN, GATE_SYMBOL } from "@/lib/gate/config";
+import { GATE_SYMBOL } from "@/lib/gate/config";
+import { CHAT_PER_DAY } from "@/lib/chat/limits";
 import vana from "../chat/vana.gif";
 
 /*
@@ -948,12 +949,12 @@ export function Landing() {
         vana={vanaAt(8)}
         demoClass="max-w-[460px]"
         details={SPEC_ACCESS}
-        title={`For ${GATE_SYMBOL} holders.`}
-        body="500k to chat. Swaps are free for all."
+        title="Sign in. Chat free."
+        body={`No ${GATE_SYMBOL} needed for now. Swaps are free for all.`}
       >
         <div className="flex flex-col gap-3.5">
           <ol className="flex flex-col rounded-card border border-line bg-surface p-1.5 text-[15px]">
-            {["Connect your wallet", "Sign in with it (a signature, no transaction)", `Hold ${GATE_MIN.toLocaleString("en-US")} ${GATE_SYMBOL}`].map((label, i) => {
+            {["Connect your wallet", "Sign in with it (a signature, no transaction)"].map((label, i) => {
               const done = s.gate > i;
               const now = s.gate === i;
               return (
@@ -975,7 +976,7 @@ export function Landing() {
           <Reveal on={s.gate >= 4} className="flex items-center justify-between gap-2 rounded-[14px] border border-line bg-surface px-3.5 py-3">
             <div>
               <div className="text-[11px] tracking-[0.08em] text-text-2 uppercase">Access</div>
-              <div className="font-mono text-[15px] font-semibold">512,450 {GATE_SYMBOL}</div>
+              <div className="text-[15px] font-semibold">Free for now</div>
             </div>
             <span className="inline-flex items-center gap-1 rounded-full border border-ok/60 px-2.5 py-[3px] text-xs font-semibold whitespace-nowrap text-ok">✓ Unlocked</span>
           </Reveal>
@@ -1390,7 +1391,8 @@ const SPEC_ACCESS = (
     rows={[
       ["how", "NEP-413 signed message, full-access key checked"],
       ["on chain", "Nothing"],
-      ["gate", `${GATE_MIN.toLocaleString("en-US")} ${GATE_SYMBOL} to chat. Swaps open`],
+      ["gate", `Signed-in wallet to chat. No ${GATE_SYMBOL} needed for now. Swaps open`],
+      ["limit", `${CHAT_PER_DAY} messages a day per IP and per wallet`],
     ]}
     files={["src/lib/auth/nep413.ts", "src/lib/gate/access.ts", "src/lib/gate/config.ts"]}
   />
