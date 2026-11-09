@@ -2,7 +2,28 @@
 
 Chat agent for NEAR. Ask whether a NEP-141 token is safe and get a plain-language risk report where every number cites its source. Then swap it through NEAR Intents: between NEAR tokens, or across chains (BTC, ETH, SOL, USDC on Base, …), in and out of NEAR. The AI only reads. Your wallet signs every transaction.
 
-> Work in progress for the NEAR Hackathon (Unstoppable DeFi · AI Security & Defense).
+> Built for NEAR HACKATHON, track **AI Security & Defense**: scam detection and wallet safeguards. Swaps across chains through NEAR Intents.
+
+## Try it
+
+Live at https://vana.nearvana.trade, on testnet by default. Each step says what to do and what you should see.
+
+1. **Open `/app`, connect a testnet wallet and sign in.** You get a signature prompt, not a transaction. If the wallet holds 500,000 NVANA ([get it on NEARVANA](https://testnet.nearvana.trade/)), the chat unlocks. Swaps work without NVANA.
+2. **Ask "is rug.vanarug4hgzsi.testnet safe?"** You get a red report: the dev's full-access key on the token, the dev keeps the pool's LP, and early buyers tie back to the dev. Every number cites its source.
+3. **Look under the reply.** On the Private tier the badge reads "Verified · private". Tap it to see the signer, the Intel TDX status and the GPU check.
+4. **Open the pane's Swap tab and swap 1 NEAR to NVANA.** You get a quote, then your wallet asks you to sign. The AI never signs.
+
+## Built with
+
+- **NEAR AI Cloud:** chat in TEEs, three privacy tiers, and every reply's signature and attestation verified (`src/lib/agent/verify.ts`).
+- **NEAR Intents (1Click):** swaps between NEAR tokens and across chains, with deposit addresses for BTC, ETH, SOL and more (`src/lib/swap/service.ts`).
+- **NEP-413:** wallet sign-in with nothing sent on chain (`src/lib/auth/nep413.ts`).
+- **NEAR RPC, FastNEAR, NearBlocks, Rhea:** the chain data behind the seven checks (`src/lib/risk/`).
+
+Safeguards:
+- **The AI only reads.** Transactions are built from the stored proposal, never from model output.
+- **Prompt-injection guard:** once a request reads stranger-written text (token names, symbols), the swap tool is off for the rest of that request (`src/lib/agent/guard.ts`).
+- **Web Search results** are shown as quotes and never fed to the agent.
 
 ## Run
 
