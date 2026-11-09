@@ -592,10 +592,10 @@ export function Landing() {
                 <Intro
                   hero
                   title="Is this NEAR token safe?"
-                  body="I check NEAR tokens for rugs, trace who's behind them, and line up the swap from any chain. Every answer is signed inside secure hardware, and only your wallet signs."
+                  body="I sniff out rugs on NEAR. Then I swap you in, from any chain."
                 />
                 <ul className="tx m-0 flex max-w-[640px] list-none flex-wrap justify-center gap-2 p-0" style={{ "--d": "1.1s" } as CSSProperties}>
-                  {["Verified on NEAR AI", "Swaps by NEAR Intents", "Your wallet signs", "Mainnet + testnet"].map((b) => (
+                  {["TEE-verified", "NEAR Intents", "You sign, I don't", "Mainnet + testnet"].map((b) => (
                     <li key={b} className="inline-flex items-center gap-1.5 rounded-full border border-line bg-surface/70 px-3 py-1 text-xs text-text-2">
                       <BadgeCheck size={13} className="text-accent" aria-hidden /> {b}
                     </li>
@@ -619,7 +619,7 @@ export function Landing() {
       </section>
 
       {/* 01 · Ask */}
-      <Chapter index={1} label="ask" secRef={sec(1)} phRef={ph(1)} vana={vanaAt(1)} title="Ask about any token." body="A symbol, a contract, or a ticker you half-remember from a group chat. I'll figure it out." details={SPEC_ASK}>
+      <Chapter index={1} label="ask" secRef={sec(1)} phRef={ph(1)} vana={vanaAt(1)} title="Ask about any token." body="Ticker, contract, or that thing from the group chat." details={SPEC_ASK}>
         <div className={clsx(CARD, "flex h-[400px] flex-col overflow-hidden")}>
           <div className="flex h-[52px] shrink-0 items-center gap-2.5 border-b border-line px-4">
             <span className="text-sm font-medium">{sent ? ASK : "New chat"}</span>
@@ -658,7 +658,7 @@ export function Landing() {
       </Chapter>
 
       {/* 02 · Check */}
-      <Chapter index={2} label="check" secRef={sec(2)} phRef={ph(2)} vana={vanaAt(2)} title="Seven checks, the same for every token." body="Read-only, public chain data, zero vibes. I ask the same seven questions of every token, even the cute ones." details={SPEC_CHECK}>
+      <Chapter index={2} label="check" secRef={sec(2)} phRef={ph(2)} vana={vanaAt(2)} title="Seven checks. Every token." body="Chain data only. Zero vibes." details={SPEC_CHECK}>
         <div className={clsx(CARD, "overflow-hidden")}>
           <div className="flex flex-col gap-2.5 border-b border-line px-[18px] py-3.5">
             <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
@@ -725,7 +725,7 @@ export function Landing() {
       </Chapter>
 
       {/* 03 · Early buyers */}
-      <Chapter index={3} label="early-buyers" secRef={sec(3)} phRef={ph(3)} vana={vanaAt(3)} title="Is the dev hiding among the first buyers?" body="Devs love buying their own launch from a fresh wallet. I follow the funding and say hi." details={SPEC_EARLY}>
+      <Chapter index={3} label="early-buyers" secRef={sec(3)} phRef={ph(3)} vana={vanaAt(3)} title="Is the dev hiding in the first buyers?" body="Fresh wallets, same funder. I notice." details={SPEC_EARLY}>
         <div className={clsx(CARD, "flex flex-col gap-3 px-[18px] py-4")}>
           <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
             <span className="font-mono text-[13px] font-semibold">rug.vanarug4hgzsi.testnet</span>
@@ -799,7 +799,7 @@ export function Landing() {
       </Chapter>
 
       {/* 04 · Answer */}
-      <Chapter index={4} label="report" secRef={sec(4)} phRef={ph(4)} vana={vanaAt(4)} title="Every number has a source." body="No “trust me bro.” Every figure I give you comes with where I read it and when." details={SPEC_REPORT}>
+      <Chapter index={4} label="report" secRef={sec(4)} phRef={ph(4)} vana={vanaAt(4)} title="Every number has a source." body="No “trust me bro.”" details={SPEC_REPORT}>
         <div className="flex flex-col gap-3">
           <Reveal on={s.report >= 1} className="flex items-center gap-2 text-[13px] text-text-2">
             <Check size={14} strokeWidth={2.5} className="text-accent" /> Checked token.sweat · 7 checks · 6 sources
@@ -852,8 +852,8 @@ export function Landing() {
         secRef={sec(7)}
         phRef={ph(7)}
         vana={vanaAt(7)}
-        title="Your wallet signs, never the AI."
-        body="I line up quotes through NEAR Intents, between NEAR tokens or in from Bitcoin, Ethereum, Solana and more. The approve button stays in your wallet."
+        title="Your wallet signs. Never me."
+        body="NEAR tokens, or in from BTC, ETH, SOL."
         details={SPEC_SWAP}
       >
         <div className="relative flex flex-col gap-3">
@@ -948,8 +948,8 @@ export function Landing() {
         vana={vanaAt(8)}
         demoClass="max-w-[460px]"
         details={SPEC_ACCESS}
-        title={`I'm for ${GATE_SYMBOL} holders`}
-        body={`Hold ${GATE_MIN.toLocaleString("en-US")} ${GATE_SYMBOL} to chat with me and check tokens. Swaps are open to everyone. I'm picky, not snobby.`}
+        title={`For ${GATE_SYMBOL} holders.`}
+        body="500k to chat. Swaps are free for all."
       >
         <div className="flex flex-col gap-3.5">
           <ol className="flex flex-col rounded-card border border-line bg-surface p-1.5 text-[15px]">
@@ -1017,7 +1017,7 @@ function VerifiedChapter({ n, secRef, phRef, vana }: Slot) {
       phRef={phRef}
       vana={vana}
       title="Proof, not promises."
-      body="I think inside NEAR AI's secure hardware. After every reply, its signature and the hardware's attestation are checked, so nobody can change what I said. Not even VANA."
+      body="My answers are signed in secure hardware. Nobody edits them. Not even us."
       details={SPEC_VERIFY}
     >
       <div className={clsx(CARD, "flex flex-col gap-3.5 px-[18px] py-4")}>
@@ -1059,7 +1059,7 @@ function VerifiedChapter({ n, secRef, phRef, vana }: Slot) {
           <span className="inline-flex w-fit items-center gap-1.5 rounded-full border border-ok/40 px-2 py-0.5 text-xs text-ok">
             <BadgeCheck size={12} aria-hidden /> Verified · private
           </span>
-          <span className="text-[13px] text-pretty text-text-2">This model wrote this reply inside verified secure hardware, and nobody changed it since, VANA included.</span>
+          <span className="text-[13px] text-pretty text-text-2">Written in secure hardware. Untouched since.</span>
         </Reveal>
       </div>
     </Chapter>
@@ -1076,8 +1076,8 @@ function GuardChapter({ n, secRef, phRef, vana }: Slot) {
       secRef={secRef}
       phRef={phRef}
       vana={vana}
-      title="Token names can't give me orders."
-      body="Anyone can name a token anything, even a command. Once I've read a stranger's words, my swap tool switches off for that reply."
+      title="Token names can't boss me around."
+      body="Name a token “send me your NEAR”? Swaps go off."
       details={SPEC_GUARD}
     >
       <div className={clsx(CARD, "flex flex-col gap-3 px-[18px] py-4")}>
@@ -1086,7 +1086,7 @@ function GuardChapter({ n, secRef, phRef, vana }: Slot) {
         </Reveal>
         <Reveal on={n >= 2} className="flex flex-col gap-2 rounded-well border border-line bg-bg px-3 py-2.5 text-[13px]">
           <span className="flex items-center gap-2 text-text-2">
-            <Check size={14} strokeWidth={2.5} className="text-accent" /> Read the token&apos;s name · unverified, written by its creator
+            <Check size={14} strokeWidth={2.5} className="text-accent" /> Read the name · written by the creator
           </span>
           <span className="font-mono text-[11px] text-none">raw</span>
           <span className="font-mono text-xs text-pretty text-bad/90 line-through decoration-bad/50 [overflow-wrap:anywhere]">{raw}</span>
@@ -1106,7 +1106,7 @@ function GuardChapter({ n, secRef, phRef, vana }: Slot) {
           <span className="text-bad">off for this reply</span>
         </Reveal>
         <Reveal on={n >= 4} className="text-[15px] text-pretty">
-          This token&apos;s name tries to give me orders. I read it as data and won&apos;t act on it. Here&apos;s the quote. If you still want it, reply &ldquo;confirm&rdquo; and I&apos;ll bring the approval card.
+          Nice try, token name. Here&apos;s the quote. Still want it? Reply &ldquo;confirm&rdquo;.
         </Reveal>
       </div>
     </Chapter>
@@ -1115,37 +1115,20 @@ function GuardChapter({ n, secRef, phRef, vana }: Slot) {
 
 /** "Do X, see Y": the same steps as the README, on testnet. */
 const TRY: [doIt: ReactNode, see: ReactNode][] = [
-  [
-    <>Open the app, connect a testnet wallet and sign in.</>,
-    <>
-      A signature prompt, no transaction. With {GATE_MIN.toLocaleString("en-US")} {GATE_SYMBOL} in the wallet, the chat unlocks. Swaps work without it.
-    </>,
-  ],
+  [<>Connect a testnet wallet</>, <>A signature, no transaction</>],
   [
     <>
       Ask <M>is {DEMO_TOKEN} safe?</M>
     </>,
-    <>A red report: the dev&apos;s keys on the token, the dev keeps the pool&apos;s LP, and early buyers tied back to the dev.</>,
+    <>Red, every flag cited</>,
   ],
-  [<>Look under the reply.</>, <>A “Verified · private” badge. Tap it for the signer, the Intel TDX status and the GPU check.</>],
-  [<>Open the pane&apos;s Swap tab and swap 1 NEAR to {GATE_SYMBOL}.</>, <>A quote, then your wallet asks you to sign. VANA never does.</>],
+  [<>Tap the badge under the reply</>, <>Signer, TDX status, GPU check</>],
+  [<>Swap 1 NEAR to {GATE_SYMBOL}</>, <>Your wallet asks you to sign, not me</>],
 ];
 
-const CANT: [title: string, body: string][] = [
-  ["Sign or send anything", "Every transaction is built from a stored proposal and signed in your wallet."],
-  ["See your keys", "Sign-in is a NEP-413 signature. Nothing goes on chain."],
-  ["Be talked into a swap", "Once a stranger's text is read, the swap tool is off for that reply."],
-  ["Let a web page change a verdict", "Web Search results are quoted, never fed to the agent, never change a level."],
-  ["Promise privacy on Incognito", "That model runs outside a TEE, and its badge says “not private”."],
-];
+const CANT = ["Sign anything.", "See your keys.", "Get prompted into a swap.", "Get swayed by a web page.", "Fake privacy on Incognito."];
 
-const BUILT: [name: string, what: string][] = [
-  ["NEAR AI Cloud", "Private inference in TEEs, signed replies, TDX and GPU attestation"],
-  ["NEAR Intents", "Cross-chain swaps settled by solvers, through 1Click"],
-  ["NEP-413", "Wallet sign-in, nothing on chain"],
-  ["NEAR RPC · FastNEAR · NearBlocks", "Chain data behind every check"],
-  ["Rhea", "Pools, prices and NEAR-to-NEAR swap routes"],
-];
+const BUILT = ["NEAR AI Cloud", "NEAR Intents", "NEP-413", "FastNEAR", "NearBlocks", "Rhea"];
 
 /** After the chapters: try it, the limits, what it runs on, and the hackathon. */
 function Proof() {
@@ -1153,25 +1136,15 @@ function Proof() {
     <div className="relative z-[31] border-t border-line bg-bg">
       <div className="mx-auto flex max-w-[1120px] flex-col gap-20 px-[6vw] py-24">
         <section id="try" aria-labelledby="try-h" className="flex scroll-mt-24 flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <span className={clsx(EYEBROW, "text-accent")}>Try it in a minute</span>
-            <h2 id="try-h" className="m-0 font-display text-[clamp(22px,3vw,36px)] leading-[1.1] font-normal">
-              Do this, see that.
-            </h2>
-            <p className="m-0 max-w-[560px] text-pretty text-text-2">On testnet, with the demo rug token we built so the checks have something to catch.</p>
-          </div>
+          <h2 id="try-h" className="m-0 font-display text-[clamp(22px,3vw,36px)] leading-[1.1] font-normal">
+            Try it.
+          </h2>
           <ol className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-4">
             {TRY.map(([d, see], i) => (
-              <li key={i} className="flex flex-col gap-3 rounded-card border border-line bg-surface p-4">
+              <li key={i} className="flex flex-col gap-2 rounded-card border border-line bg-surface p-4">
                 <span className="grid size-7 place-items-center rounded-full bg-accent font-mono text-xs font-semibold text-accent-ink">{i + 1}</span>
-                <div className="flex flex-col gap-1">
-                  <span className="font-mono text-[11px] text-none uppercase">do</span>
-                  <span className="text-[15px] text-pretty">{d}</span>
-                </div>
-                <div className="flex flex-col gap-1 border-t border-line pt-3">
-                  <span className="font-mono text-[11px] text-none uppercase">see</span>
-                  <span className="text-[13px] text-pretty text-text-2">{see}</span>
-                </div>
+                <span className="text-[15px] text-pretty">{d}</span>
+                <span className="text-[13px] text-pretty text-text-2">→ {see}</span>
               </li>
             ))}
           </ol>
@@ -1186,18 +1159,13 @@ function Proof() {
         </section>
 
         <section aria-labelledby="cant-h" className="flex flex-col gap-6">
-          <div className="flex flex-col gap-2">
-            <span className={clsx(EYEBROW, "text-accent")}>The trust model</span>
-            <h2 id="cant-h" className="m-0 font-display text-[clamp(22px,3vw,36px)] leading-[1.1] font-normal">
-              What I can&apos;t do.
-            </h2>
-          </div>
+          <h2 id="cant-h" className="m-0 font-display text-[clamp(22px,3vw,36px)] leading-[1.1] font-normal">
+            What I can&apos;t do.
+          </h2>
           <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-5">
-            {CANT.map(([t, b]) => (
-              <li key={t} className="flex flex-col gap-2 rounded-card border border-line bg-surface p-4">
-                <Ban size={18} className="text-bad" aria-hidden />
-                <span className="font-semibold">{t}</span>
-                <span className="text-[13px] text-pretty text-text-2">{b}</span>
+            {CANT.map((t) => (
+              <li key={t} className="flex items-center gap-2.5 rounded-card border border-line bg-surface p-4 font-semibold">
+                <Ban size={18} className="shrink-0 text-bad" aria-hidden /> {t}
               </li>
             ))}
           </ul>
@@ -1205,27 +1173,22 @@ function Proof() {
 
         <section aria-labelledby="built-h" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,420px),1fr))] gap-10">
           <div className="flex flex-col gap-4">
-            <span className={clsx(EYEBROW, "text-accent")}>Built with</span>
-            <h2 id="built-h" className="sr-only">
+            <h2 id="built-h" className={clsx(EYEBROW, "m-0 text-accent")}>
               Built with
             </h2>
-            <dl className="m-0 flex flex-col divide-y divide-line rounded-card border border-line bg-surface">
-              {BUILT.map(([name, what]) => (
-                <div key={name} className="flex flex-col gap-0.5 px-4 py-3">
-                  <dt className="font-semibold">{name}</dt>
-                  <dd className="m-0 text-[13px] text-text-2">{what}</dd>
-                </div>
+            <ul className="m-0 flex list-none flex-wrap gap-2 p-0">
+              {BUILT.map((name) => (
+                <li key={name} className="rounded-full border border-line bg-surface px-3.5 py-1.5 text-sm font-medium">
+                  {name}
+                </li>
               ))}
-            </dl>
+            </ul>
           </div>
           <div className="flex flex-col gap-4">
             <span className={clsx(EYEBROW, "text-accent")}>NEAR HACKATHON · Nov 2026</span>
             <div className="flex flex-col gap-3 rounded-card border border-accent/45 bg-surface p-5">
               <span className="font-display text-[22px] leading-tight">AI Security &amp; Defense</span>
-              <p className="m-0 text-[14px] text-pretty text-text-2">
-                Scam detection and wallet safeguards for NEAR tokens: rug checks with cited sources, replies signed in TEEs, and an agent that can&apos;t be prompted into
-                moving your money. Swaps across chains through NEAR Intents.
-              </p>
+              <p className="m-0 text-[14px] text-pretty text-text-2">Rug detection, signed answers, an agent you can&apos;t trick into moving your money.</p>
               <div className="flex flex-col gap-2 border-t border-line pt-3">
                 <span className="text-[11px] text-none">Check it yourself</span>
                 <div className="flex flex-wrap gap-1.5">
@@ -1319,11 +1282,10 @@ const SPEC_ASK = (
   <Spec
     title="Finding the token"
     rows={[
-      ["takes", "A symbol, a name, or a contract account id like token.sweat"],
-      ["searches", "Rhea's price and swap lists, and the launches on nearly (mainnet) and NEARVANA (testnet)"],
-      ["same symbol", "Many tokens share one. Every match is listed, verified and well-pooled first, and you pick"],
-      ["networks", "NEAR mainnet and testnet"],
-      ["access", "Read-only: public RPC and indexer calls, no keys"],
+      ["takes", "Symbol, name, or account id"],
+      ["searches", "Rhea lists, nearly and NEARVANA launches"],
+      ["dupes", "All matches shown, verified first. You pick"],
+      ["networks", "Mainnet + testnet"],
     ]}
     files={["src/lib/agent/search.ts", "src/lib/agent/tools.ts"]}
   />
@@ -1331,34 +1293,31 @@ const SPEC_ASK = (
 
 const SPEC_CHECK = (
   <Spec
-    title="The seven checks and where they flag"
+    title="The seven checks"
     rows={[
-      ["contract", "Full-access keys on the token account, its owner, and methods that mint, upgrade, pause or set fees, read from the wasm"],
-      ["holders", <>Top 10 outside pools, lockers and burns: <Y>≥25%</Y> watch, <R>≥50%</R> red. Dev and linked wallets: <Y>&gt;5%</Y>, <R>≥15%</R></>],
-      ["fresh wallets", <>Top holders under 7 days old: <Y>≥3%</Y> of supply, <R>≥10%</R></>],
-      ["liquidity", <>Under <Y>$500</Y> on the other side is thin. A dev with LP can pull it: <R>≥50%</R> of a pool is red</>],
-      ["taxes", <>Buy or sell tax from the token, its pool or its launchpad: <Y>≥3%</Y>, <R>≥10%</R></>],
-      ["early buyers", <>First 20 buyers and anyone within 10 s. <R>3 linked wallets</R> or <R>5%</R> of supply is red</>],
-      ["creator", <>Past launches that sold off or died (pool under $50): <R>2 or more</R>, and at least half, is red</>],
+      ["contract", "Keys, owner, mint / upgrade / pause / fee methods"],
+      ["holders", <>Top 10 <Y>≥25%</Y> · <R>≥50%</R>. Dev <Y>&gt;5%</Y> · <R>≥15%</R></>],
+      ["fresh wallets", <>Under 7 days old: <Y>≥3%</Y> · <R>≥10%</R></>],
+      ["liquidity", <>Thin under <Y>$500</Y>. Dev owns <R>≥50%</R> of LP</>],
+      ["taxes", <><Y>≥3%</Y> · <R>≥10%</R></>],
+      ["early buyers", <>First 20 + anyone in 10 s. <R>3 linked</R> or <R>5%</R></>],
+      ["creator", <><R>2+</R> dead or dumped launches</>],
     ]}
-    notes={[
-      <>Launchpad tokens use global contracts and report an empty <M>code_hash</M>. The check reads <M>global_contract_hash</M>, so they don&apos;t pass as &ldquo;no contract&rdquo;.</>,
-      "Overall level is the worst of the checks that ran. A report is kept 5 minutes, then computed again.",
-    ]}
+    notes={[<>Reads <M>global_contract_hash</M>, so launchpad tokens don&apos;t pass as empty.</>, "Worst check wins. Cached 5 min."]}
     files={["src/lib/risk/rules.ts", "src/lib/risk/contract.ts", "src/lib/risk/holders.ts", "src/lib/risk/liquidity.ts"]}
   />
 );
 
 const SPEC_EARLY = (
   <Spec
-    title="How bundles are found"
+    title="Bundle hunting"
     rows={[
-      ["reads", "The token's own transfer events, from its first transactions"],
-      ["window", "The first 20 wallets to buy from a new pool, plus any that bought within 10 s of it opening"],
-      ["linked if", "Funded by the dev or by the same wallet, a sub-account of the dev, or passing the coin between them"],
-      ["ignored", "Funders with 20,000+ transactions (exchanges, relayers): sharing one links no one"],
-      ["red", <><R>3 linked wallets</R>, or <R>5%</R> of supply between them</>],
-      ["snipers", "A wallet early in 3 or more launches is called a sniper bot"],
+      ["reads", "The token's first transfers"],
+      ["window", "First 20 buyers + anyone in 10 s"],
+      ["linked", "Same funder, dev sub-account, or coins passed"],
+      ["ignored", "Funders with 20k+ txs (exchanges)"],
+      ["red", <><R>3 linked</R> or <R>5%</R> of supply</>],
+      ["snipers", "Early in 3+ launches"],
     ]}
     files={["src/lib/risk/bundle.ts", "src/lib/risk/wallets.ts", "src/lib/risk/creator.ts"]}
   />
@@ -1366,48 +1325,42 @@ const SPEC_EARLY = (
 
 const SPEC_REPORT = (
   <Spec
-    title="Where the numbers come from"
+    title="Sources"
     rows={[
-      ["chain", "NEAR RPC (FastNEAR): accounts, keys, code, views"],
-      ["holders", "FastNEAR API top 100, NearBlocks as fallback"],
-      ["history", "NearBlocks: transfers, wallet age, first funder"],
-      ["liquidity", "Rhea classic and DCL pools, Rhea prices in USD"],
-      ["launches", "The nearly, justhoot and NEARVANA launchpad contracts"],
+      ["chain", "NEAR RPC (FastNEAR)"],
+      ["holders", "FastNEAR, NearBlocks fallback"],
+      ["history", "NearBlocks"],
+      ["liquidity", "Rhea classic + DCL"],
+      ["launches", "nearly, justhoot, NEARVANA"],
     ]}
-    notes={[
-      "Each figure carries its source and the time it was read.",
-      "Names and symbols are written by whoever made the token. They're shown as data, cleaned of hidden characters.",
-      "Web Search (opt-in, in the Check tab) runs one search through NEAR AI and sums it up with a private model. It's shown as quotes with sources, never given to the agent, and never changes a level.",
-    ]}
+    notes={["Token names are data, cleaned of hidden characters.", "Web Search: quoted, never fed to me, never changes a level."]}
     files={["src/lib/risk/report.ts", "src/lib/risk/web.ts", "docs/probes.md"]}
   />
 );
 
 const SPEC_VERIFY = (
   <Spec
-    title="What the badge proves"
+    title="What the badge means"
     rows={[
-      ["Private", <>Open model on NEAR AI&apos;s own TEE GPUs. The model&apos;s TEE signs: <span className="text-ok">Verified · private</span></>],
-      ["Partner", <>Bigger open model in a partner&apos;s TEE. NEAR AI&apos;s TEE gateway signs: <span className="text-ok">Signed · partner hardware</span></>],
-      ["Incognito", <>OpenAI through NEAR AI&apos;s gateway, without your identity. Run outside a TEE: <span className="text-text-2">Signed · not private</span></>],
-      ["signed", "The exact request and response bytes of every model call in the reply, so the tool data fed to the model too"],
-      ["attested", "Intel TDX quote of the signing hardware, plus NVIDIA GPU evidence for model signatures, checked by VANA's server"],
-      ["library", <M>@nearai/inference-sdk</M>],
+      ["Private", <>Model&apos;s own TEE signs · <span className="text-ok">Verified · private</span></>],
+      ["Partner", <>NEAR AI&apos;s TEE gateway signs · <span className="text-ok">Signed · partner hardware</span></>],
+      ["Incognito", <>OpenAI, outside a TEE · <span className="text-text-2">Signed · not private</span></>],
+      ["signed", "Exact request + response bytes, tool data included"],
+      ["attested", "Intel TDX + NVIDIA GPU, checked by our server"],
+      ["sdk", <M>@nearai/inference-sdk</M>],
     ]}
-    notes={["A reply that fails the check says “Not verified” and why. Tap any badge in the app for the signer, the hardware status and the model."]}
     files={["src/lib/agent/verify.ts", "src/lib/agent/model.ts", "src/components/chat/verify-badge.tsx"]}
   />
 );
 
 const SPEC_GUARD = (
   <Spec
-    title="The prompt-injection guard"
+    title="Injection guard"
     rows={[
-      ["trips on", "An unverified token's name or symbol, search matches, or the tokens in a wallet: any text a stranger wrote"],
-      ["then", <><M>propose_swap</M> is removed from the model&apos;s tools for the rest of that request, and throws if called anyway</>],
-      ["cleaning", "Unicode NFKC, control, zero-width and direction-override characters removed, one line, 48 characters at most"],
-      ["prompt", "Chain text is data. Instructions in it are never followed, even ones that claim to be from the user or the system"],
-      ["after", "Quotes still work. The approval card comes back when you ask again in a new message, which starts a clean request"],
+      ["trips on", "Unverified token names, symbols, wallet contents"],
+      ["then", <><M>propose_swap</M> removed for the reply. Throws if called</>],
+      ["cleaning", "NFKC, no hidden or flip characters, 48 chars max"],
+      ["reset", "Ask again in a new message"],
     ]}
     files={["src/lib/agent/guard.ts", "src/lib/agent/tools.ts", "src/lib/agent/prompt.ts"]}
   />
@@ -1415,29 +1368,29 @@ const SPEC_GUARD = (
 
 const SPEC_SWAP = (
   <Spec
-    title="From quote to settled"
+    title="Quote to settled"
     rows={[
-      ["1 · quote", "A dry quote, open to anyone"],
-      ["2 · propose", "Stored with exactly what you were shown"],
-      ["3 · approve", "A fresh quote, checked again against what you saw"],
-      ["4 · sign", "Your wallet signs. Transactions are built from the stored proposal, never from model output"],
-      ["5 · track", "Followed until it settles, or refunds"],
-      ["cross-chain", "Through NEAR Intents, in or out of NEAR: Bitcoin, Ethereum, Solana, Base, Arbitrum, BNB Chain, Zcash and more (mainnet)"],
-      ["deposits", "Paying from another chain gives a one-time deposit address and a deadline. Short or late transfers are refunded to your address"],
-      ["addresses", "Checked as you type, again on the server, and again by NEAR Intents"],
+      ["1 · quote", "Dry, open to anyone"],
+      ["2 · propose", "Saved with what you saw"],
+      ["3 · approve", "Re-quoted, checked against it"],
+      ["4 · sign", "Your wallet. Built from the proposal, not the model"],
+      ["5 · track", "Until settled or refunded"],
+      ["chains", "BTC, ETH, SOL, Base, Arbitrum, BNB, Zcash + more (mainnet)"],
+      ["deposits", "One-time address, deadline, auto-refund"],
+      ["addresses", "Checked 3×: form, server, NEAR Intents"],
     ]}
-    notes={["When NEAR comes out as wNEAR, the card offers a one-tap unwrap.", "On testnet, swaps go through Rhea's testnet pools and your testnet wallet."]}
+    notes={["wNEAR out? One-tap unwrap.", "Testnet runs on Rhea's testnet pools."]}
     files={["src/lib/swap/service.ts", "src/lib/swap/chains.ts", "src/lib/sources/intents.ts"]}
   />
 );
 
 const SPEC_ACCESS = (
   <Spec
-    title="Sign-in and access"
+    title="Sign-in"
     rows={[
-      ["sign-in", "NEP-413: your wallet signs {message, nonce, recipient}. The server checks the ed25519 signature and that the key is a full-access key of the account"],
-      ["on chain", "Nothing. A sign-in can never be a valid transaction"],
-      ["gate", `Chat and token checks: ${GATE_MIN.toLocaleString("en-US")} ${GATE_SYMBOL} in the signed-in wallet. Swaps: everyone`],
+      ["how", "NEP-413 signed message, full-access key checked"],
+      ["on chain", "Nothing"],
+      ["gate", `${GATE_MIN.toLocaleString("en-US")} ${GATE_SYMBOL} to chat. Swaps open`],
     ]}
     files={["src/lib/auth/nep413.ts", "src/lib/gate/access.ts", "src/lib/gate/config.ts"]}
   />
