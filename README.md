@@ -6,7 +6,7 @@ Built at NEAR HACKATHON. Tracks:
 
 - **AI Security & Defense** (`security`, primary): scam detection before you buy, an AI that can't sign, a prompt-injection guard, and TEE attestation checked on every reply.
 - **Privacy & Private AI** (`privacy`): the chat runs on NEAR AI Cloud in TEEs, and the server verifies each reply's signature and the Intel TDX and GPU attestation behind it.
-- **Unstoppable DeFi** (`defi`): a trading agent that swaps between NEAR tokens and across chains through NEAR Intents 1Click, with no custodian.
+- **Unstoppable DeFi** (`defi`): a trading agent that swaps between NEAR tokens and across chains through NEAR Intents, with no custodian.
 
 ## Try it
 
@@ -15,7 +15,7 @@ Live at https://vana.nearvana.trade, on testnet by default (the header badge swi
 1. **Open `/app`, connect a testnet wallet and sign in.** You get a signature prompt, not a transaction. Any signed-in wallet can chat, up to 200 messages a day.
 2. **Ask "is rug.vanarug4hgzsi.testnet safe?"** You get a red report: the dev's full-access key on the token, the dev keeps the pool's LP, and early buyers tie back to the dev. Every number cites its source.
 3. **Look under the reply.** On the Private tier the badge reads "Verified · private". Tap it to see the signer, the Intel TDX status and the GPU check.
-4. **Ask "swap 1 NEAR to NVANA", or use the pane's Swap tab.** You get an approval card with the quote, then your wallet asks you to sign. The AI never signs.
+4. **Ask "swap 1 NEAR to nvana.nearvana2.nearvanapad.testnet".** VANA quotes it and runs the token check first, then asks you to decide. Reply "yes, swap it": an approval card with the quote appears in the pane, and your wallet asks you to sign. The AI never signs. The card can't appear in the same reply that read token names or symbols (the prompt-injection guard below), so a swap always takes your second message. The pane's Swap tab skips the chat and quotes straight away.
 5. **No wallet needed for a cross-chain quote: pick mainnet with the header badge, open the pane's Swap tab and quote USDC on Base to NEAR.** You get a live NEAR Intents quote. Nothing is sent until a signed-in wallet approves it.
 
 ### Testnet and mainnet
@@ -33,7 +33,7 @@ NEAR Intents has no testnet, so what works depends on the network picked in the 
 ## Built with
 
 - **NEAR AI Cloud:** chat in TEEs, three privacy tiers, and every reply's signature and attestation verified (`src/lib/agent/verify.ts`).
-- **NEAR Intents (1Click):** swaps between NEAR tokens and across chains, with deposit addresses for BTC, ETH, SOL and more, and status tracking through to success, refund or failure (`src/lib/swap/service.ts`).
+- **NEAR Intents:** through 1Click, or Aurora's Swap API in front of the same solvers (the live site uses Aurora; see `INTENTS_PROVIDER` below). Swaps between NEAR tokens and across chains, with deposit addresses for BTC, ETH, SOL and more, and status tracking through to success, refund or failure (`src/lib/swap/service.ts`).
 - **NEP-413:** wallet sign-in with nothing sent on chain (`src/lib/auth/nep413.ts`).
 - **Ethereum wallets (NEP-518):** `0x…` NEAR accounts connect through near-connect's Ethereum Wallets and sign in with EIP-191 `personal_sign`, checked on the server (`src/lib/auth/eth.ts`). Their swaps go one action per transaction.
 - **NEAR RPC, FastNEAR, NearBlocks, Rhea:** the chain data behind the seven checks (`src/lib/risk/`).
