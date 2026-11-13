@@ -5,6 +5,7 @@ import { BadgeCheck, LogOut, PenLine, Wallet } from "lucide-react";
 import { useEffect } from "react";
 import { useSession } from "@/components/session/use-session";
 import { NearvanaLink } from "@/components/nearvana/nearvana";
+import { InstallButton } from "@/components/pwa/install-button";
 import { EYEBROW, STICKER } from "@/components/ui/styles";
 import { useWallet } from "./wallet-provider";
 
@@ -12,7 +13,8 @@ const fmt = (n: number) => n.toLocaleString("en-US", { maximumFractionDigits: 0 
 
 /**
  * The wallet at the foot of the sidebar: connect it, sign in with it (NEP-413) so chats are kept
- * under the account, and see whether it unlocks the chat (free for now; NVANA when the gate asks). The launchpad link sits on top.
+ * under the account, and see whether it unlocks the chat (free for now; NVANA when the gate asks). The launchpad link and
+ * the Install app button sit on top.
  */
 export function WalletPanel() {
   const { account, ready, connecting, error, connect, disconnect } = useWallet();
@@ -29,6 +31,7 @@ export function WalletPanel() {
     return (
       <div className="flex flex-col gap-2.5">
         <NearvanaLink />
+        <InstallButton />
         <button type="button" onClick={() => void connect()} disabled={!ready || connecting} className={clsx(STICKER, "gap-2 rounded-full px-3.5 py-2 text-sm")}>
           <Wallet size={16} />
           {connecting ? "Connecting…" : "Connect wallet"}
@@ -43,6 +46,7 @@ export function WalletPanel() {
   return (
     <div className="flex flex-col gap-2.5">
       <NearvanaLink />
+      <InstallButton />
       {a && (
         <div className="flex items-center justify-between gap-2 rounded-well border border-line bg-surface px-3 py-2.5">
           <div className="min-w-0">

@@ -37,6 +37,7 @@ NEAR Intents has no testnet, so what works depends on the network picked in the 
 - **NEP-413:** wallet sign-in with nothing sent on chain (`src/lib/auth/nep413.ts`).
 - **Ethereum wallets (NEP-518):** `0x…` NEAR accounts connect through near-connect's Ethereum Wallets and sign in with Ethereum (EIP-4361 over `personal_sign`), checked on the server (`src/lib/auth/eth.ts`). Signing in needs a wallet in the browser: an extension on desktop, or the browser inside the MetaMask or Rabby app on a phone. Through WalletConnect it connects but can't sign in yet, so it can't swap here either. Their swaps go one action per transaction; if the wallet stops partway after the payment may have gone out, the swap is followed or flagged instead of offered again.
 - **NEAR RPC, FastNEAR, NearBlocks, Rhea:** the chain data behind the seven checks (`src/lib/risk/`).
+- **Installable (PWA):** "Install app" in the sidebar puts VANA on the home screen or desktop, opening straight into the chat. Chrome, Edge and Android get the browser's install dialog; iPhone, iPad and Safari get the steps to add it by hand (`src/lib/pwa/install.ts`, `public/sw.js`, `src/app/manifest.ts`).
 
 Safeguards:
 - **The AI only reads.** Transactions are built from the stored proposal, never from model output.
