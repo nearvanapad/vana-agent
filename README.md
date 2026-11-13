@@ -1,17 +1,29 @@
 # VANA — NEAR token agent
 
-Chat agent for NEAR. Ask whether a NEP-141 token is safe and get a plain-language risk report where every number cites its source. Then swap it through NEAR Intents: between NEAR tokens, or across chains (BTC, ETH, SOL, USDC on Base, …), in and out of NEAR. The AI only reads. Your wallet signs every transaction.
+VANA is an AI agent that checks NEAR tokens for scam risk and swaps them through chat. Ask "is this token safe?" and get a seven-check report, each check green, yellow or red with sourced numbers. The checks cover contract powers, holder concentration, bundled and sniper early buyers, fresh wallets, pullable liquidity, taxes and the creator's past launches. Then swap across chains with NEAR Intents. The chat runs on NEAR AI Cloud in TEEs, and every reply's signature and attestation is verified. The AI only reads: your wallet signs everything, and a prompt-injection guard blocks swaps once stranger-written text has been read.
 
-> Built for NEAR HACKATHON, track **AI Security & Defense**: scam detection and wallet safeguards. Swaps across chains through NEAR Intents.
+> Built at NEAR HACKATHON, track **AI Security & Defense**: scam detection and wallet safeguards. Swaps across chains through NEAR Intents.
 
 ## Try it
 
-Live at https://vana.nearvana.trade, on testnet by default. Each step says what to do and what you should see.
+Live at https://vana.nearvana.trade, on testnet by default (the header badge switches to mainnet). Each step says what to do and what you should see.
 
-1. **Open `/app`, connect a testnet wallet and sign in.** You get a signature prompt, not a transaction. If the wallet holds 500,000 NVANA ([get it on NEARVANA](https://testnet.nearvana.trade/)), the chat unlocks. Swaps work without NVANA.
+1. **Open `/app`, connect a testnet wallet and sign in.** You get a signature prompt, not a transaction. Any signed-in wallet can chat, up to 200 messages a day.
 2. **Ask "is rug.vanarug4hgzsi.testnet safe?"** You get a red report: the dev's full-access key on the token, the dev keeps the pool's LP, and early buyers tie back to the dev. Every number cites its source.
 3. **Look under the reply.** On the Private tier the badge reads "Verified · private". Tap it to see the signer, the Intel TDX status and the GPU check.
-4. **Open the pane's Swap tab and swap 1 NEAR to NVANA.** You get a quote, then your wallet asks you to sign. The AI never signs.
+4. **Ask "swap 1 NEAR to NVANA", or use the pane's Swap tab.** You get an approval card with the quote, then your wallet asks you to sign. The AI never signs.
+
+### Testnet and mainnet
+
+NEAR Intents has no testnet, so what works depends on the network picked in the header:
+
+| | Testnet | Mainnet |
+|---|---|---|
+| Token checks | Yes (they read both networks either way) | Yes |
+| Swaps between NEAR tokens | Yes, through Rhea's testnet pools | Yes, through NEAR Intents, or Rhea when Intents has no route |
+| Cross-chain swaps (BTC, ETH, SOL, …) | No | Yes, through NEAR Intents |
+| Verified chat (NEAR AI Cloud) | Yes | Yes |
+
 
 ## Built with
 
@@ -24,6 +36,16 @@ Safeguards:
 - **The AI only reads.** Transactions are built from the stored proposal, never from model output.
 - **Prompt-injection guard:** once a request reads stranger-written text (token names, symbols), the swap tool is off for the rest of that request (`src/lib/agent/guard.ts`).
 - **Web Search results** are shown as quotes and never fed to the agent.
+
+Libraries: Next.js, React, the Vercel AI SDK, `@nearai/inference-sdk`, `@hot-labs/near-connect` (wallet connect), `near-api-js`, TanStack Query, Radix UI, Tailwind CSS, zod, better-sqlite3. No starter template.
+
+AI-written code: most of this repo was written with [Claude Code](https://claude.com/claude-code) (Anthropic), directed and tested by the team.
+
+## What existed before the hackathon
+
+This repo started on 2026-10-30, after the hackathon was announced. VANA is the hackathon work.
+
+It was built alongside NEARVANA, our NEAR token launchpad (separate repo, started 2026-09-29), which existed before the hackathon. NEARVANA and its NVANA token are baseline, not part of this submission. VANA only reads the launchpad contracts (NEARVANA, nearly, justhoot) as data sources, and lists NVANA as one token you can swap.
 
 ## Run
 
