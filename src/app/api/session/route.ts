@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { verifyEthSignIn } from "@/lib/auth/eth";
 import { challenge, SignInError, verifySignIn } from "@/lib/auth/nep413";
 import { ensureSession, readSession, signIn, signOut } from "@/lib/auth/session";
 import { access } from "@/lib/gate/access";
 
-/** Who the browser is (a guest, or a wallet account signed in with NEP-413) and whether it may chat. `?fresh=1` rereads the balance. */
+/** Who the browser is (a guest, or a wallet account signed in with NEP-413 or, for `0x` accounts, EIP-191) and whether it may chat. `?fresh=1` rereads the balance. */
 export async function GET(req: Request) {
   const s = await ensureSession();
   const fresh = new URL(req.url).searchParams.has("fresh");
@@ -19,6 +20,13 @@ const Body = z.discriminatedUnion("step", [
     signature: z.string().max(256),
     nonce: z.string().max(64),
   }),
+  // NEAR accounts controlled by an Ethereum key sign with `personal_sign` (see lib/auth/eth.ts).
+  z.object({
+    step: z.literal("verify-eth"),
+    accountId: z.string().regex(/^0x[0-9a-fA-F]{40}$/),
+    signature: z.string().regex(/^0x[0-9a-fA-F]{130}$/),
+    nonce: z.string().max(64),
+  }),
 ]);
 
 /** The NEP-413 recipient: the host the user sees, so a signature for another site can't be replayed here. */
@@ -30,7 +38,8 @@ export async function POST(req: Request) {
   const s = await ensureSession();
   if (body.data.step === "challenge") return Response.json(challenge(recipientOf(req)));
   try {
-    const account = await verifySignIn(body.data, recipientOf(req), s.network);
+    const account =
+      body.data.step === "verify-eth" ? verifyEthSignIn(body.data, recipientOf(req), s.network) : await verifySignIn(body.data, recipientOf(req), s.network);
     const signed = signIn(s, account).account;
     return Response.json({ account: signed, access: await access(signed, { fresh: true }) });
   } catch (e) {

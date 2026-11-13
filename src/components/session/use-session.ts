@@ -2,8 +2,11 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useState } from "react";
+import { ethSignInText, isEthAccount } from "@/lib/auth/sign-in-text";
 import type { Access } from "@/lib/gate/config";
-import { signMessage } from "@/lib/near/wallet";
+import { ethPersonalSign } from "@/lib/near/eth-sign";
+import { WALLET } from "@/lib/near/network";
+import { restoreAccount, signMessage } from "@/lib/near/wallet";
 
 type SessionInfo = { account: string | null; access: Access };
 
@@ -32,12 +35,17 @@ export function useSession() {
       const c = await fetch("/api/session", { method: "POST", body: JSON.stringify({ step: "challenge" }) }).then((r) =>
         json<{ message: string; recipient: string; nonce: string }>(r),
       );
+      const verify = (body: object) => fetch("/api/session", { method: "POST", body: JSON.stringify(body) }).then((r) => json<SessionInfo>(r));
+      // A `0x…` account (Ethereum Wallets) can't sign NEP-413: its extension signs EIP-191 instead.
+      const account = await restoreAccount();
+      if (isEthAccount(account)) {
+        const text = ethSignInText({ account, network: WALLET.id, recipient: c.recipient, nonce: c.nonce });
+        const signature = await ethPersonalSign(account, text);
+        return verify({ step: "verify-eth", accountId: account, signature, nonce: c.nonce });
+      }
       const nonce = Uint8Array.from(atob(c.nonce), (ch) => ch.charCodeAt(0));
       const signed = await signMessage(c.message, c.recipient, nonce);
-      return fetch("/api/session", {
-        method: "POST",
-        body: JSON.stringify({ step: "verify", ...signed, nonce: c.nonce }),
-      }).then((r) => json<SessionInfo>(r));
+      return verify({ step: "verify", ...signed, nonce: c.nonce });
     },
     onSuccess: done,
   });

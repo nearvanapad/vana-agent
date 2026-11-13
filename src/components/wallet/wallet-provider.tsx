@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { connectWallet, disconnectWallet, onWalletChange, restoreAccount } from "@/lib/near/wallet";
+import { EthWalletPicker } from "./eth-wallet-picker";
 
 type WalletState = {
   account: string | null;
@@ -54,7 +55,12 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     setAccount(null);
   }, []);
 
-  return <Ctx value={{ account, ready, connecting, error, connect, disconnect }}>{children}</Ctx>;
+  return (
+    <Ctx value={{ account, ready, connecting, error, connect, disconnect }}>
+      {children}
+      <EthWalletPicker />
+    </Ctx>
+  );
 }
 
 export function useWallet(): WalletState {

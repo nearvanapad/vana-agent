@@ -2,7 +2,7 @@
 
 import type { NearConnector, NearWalletBase } from "@hot-labs/near-connect";
 import { NETWORK, RPC_URL } from "./config";
-import type { WalletTx } from "./tx";
+import { oneActionEach, outcomesPerTx, type WalletTx } from "./tx";
 
 export type { WalletTx };
 
@@ -56,12 +56,24 @@ export function failedOnChain(o: FinalExecutionOutcome): boolean {
   return typeof s === "object" && s !== null && "Failure" in s;
 }
 
+/** Wallets that take one action per transaction (NEP-518, an Ethereum key behind a NEAR account). */
+const SINGLE_ACTION = ["ethereum-wallets"];
+
 /**
- * Sign and send in order. Wallets that can't batch get one approval per transaction;
+ * Sign and send in order. Multi-action transactions are split for SINGLE_ACTION wallets, with
+ * one outcome per original transaction still returned. Wallets that can't batch get one approval per transaction;
  * a transaction that fails on chain stops the rest (later ones depend on it).
  */
 export async function sendTransactions(txs: WalletTx[]): Promise<FinalExecutionOutcome[]> {
   const w: NearWalletBase = await (await getConnector()).wallet();
+  if (SINGLE_ACTION.includes(w.manifest.id) && txs.some((t) => t.actions.length > 1)) {
+    const { parts, owner } = oneActionEach(txs);
+    return outcomesPerTx(owner, await sendAll(w, parts), failedOnChain);
+  }
+  return sendAll(w, txs);
+}
+
+async function sendAll(w: NearWalletBase, txs: WalletTx[]): Promise<FinalExecutionOutcome[]> {
   if (txs.length > 1 && w.manifest.features?.signAndSendTransactions === false) {
     const out: FinalExecutionOutcome[] = [];
     for (const t of txs) {

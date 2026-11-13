@@ -38,3 +38,40 @@ export const ftTransfer = (receiver: string, amount: string) =>
 
 export const ftTransferCall = (receiver: string, amount: string, msg: string, gasTgas: number = GAS.swap) =>
   call("ft_transfer_call", { receiver_id: receiver, amount, memo: null, msg }, gasTgas, ONE_YOCTO);
+
+/**
+ * Wallets that sign through an Ethereum key (NEP-518) take one action per transaction. Splits each
+ * transaction into one per action, same receiver, in order; `owner[i]` is the index in `txs` that
+ * part `i` came from. The parts are no longer atomic: they run in order and stop at the first failure.
+ */
+export function oneActionEach(txs: WalletTx[]): { parts: WalletTx[]; owner: number[] } {
+  const parts: WalletTx[] = [];
+  const owner: number[] = [];
+  txs.forEach((t, i) =>
+    t.actions.forEach((a) => {
+      parts.push({ receiverId: t.receiverId, actions: [a] });
+      owner.push(i);
+    }),
+  );
+  return { parts, owner };
+}
+
+/**
+ * The outcomes of split parts, back as one per original transaction: its last part's outcome, or
+ * the part that failed (and nothing after it). A transaction whose parts did not all run is left
+ * out, so callers still see fewer outcomes than transactions.
+ */
+export function outcomesPerTx<T>(owner: number[], outcomes: T[], failed: (o: T) => boolean): T[] {
+  const out: T[] = [];
+  for (let i = 0; i < outcomes.length; i++) {
+    const o = outcomes[i]!;
+    const tx = owner[i]!;
+    if (failed(o)) {
+      out[tx] = o;
+      return out.filter((x) => x !== undefined);
+    }
+    // Only the transaction's last part completes it.
+    if (owner[i + 1] !== tx) out[tx] = o;
+  }
+  return out.filter((x) => x !== undefined);
+}

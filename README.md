@@ -35,6 +35,7 @@ NEAR Intents has no testnet, so what works depends on the network picked in the 
 - **NEAR AI Cloud:** chat in TEEs, three privacy tiers, and every reply's signature and attestation verified (`src/lib/agent/verify.ts`).
 - **NEAR Intents (1Click):** swaps between NEAR tokens and across chains, with deposit addresses for BTC, ETH, SOL and more, and status tracking through to success, refund or failure (`src/lib/swap/service.ts`).
 - **NEP-413:** wallet sign-in with nothing sent on chain (`src/lib/auth/nep413.ts`).
+- **Ethereum wallets (NEP-518):** `0x…` NEAR accounts connect through near-connect's Ethereum Wallets and sign in with EIP-191 `personal_sign`, checked on the server (`src/lib/auth/eth.ts`). Their swaps go one action per transaction.
 - **NEAR RPC, FastNEAR, NearBlocks, Rhea:** the chain data behind the seven checks (`src/lib/risk/`).
 
 Safeguards:
@@ -42,7 +43,7 @@ Safeguards:
 - **Prompt-injection guard:** once a request reads stranger-written text (token names, symbols), the swap tool is off for the rest of that request (`src/lib/agent/guard.ts`).
 - **Web Search results** are shown as quotes and never fed to the agent.
 
-Libraries: Next.js, React, the Vercel AI SDK, `@nearai/inference-sdk`, `@hot-labs/near-connect` (wallet connect), `near-api-js`, TanStack Query, Radix UI, Tailwind CSS, zod, better-sqlite3. No starter template.
+Libraries: Next.js, React, the Vercel AI SDK, `@nearai/inference-sdk`, `@hot-labs/near-connect` (wallet connect), `near-api-js`, `@noble/curves` and `@noble/hashes` (Ethereum sign-in), TanStack Query, Radix UI, Tailwind CSS, zod, better-sqlite3. No starter template.
 
 AI-written code: most of this repo was written with [Claude Code](https://claude.com/claude-code) (Anthropic), directed and tested by the team.
 

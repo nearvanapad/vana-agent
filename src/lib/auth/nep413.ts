@@ -3,6 +3,7 @@ import { kv } from "../db";
 import type { Network } from "../near/network";
 import { onNetwork } from "../near/network-server";
 import { viewAccessKeys } from "../near/rpc";
+import { SIGN_IN_MESSAGE } from "./sign-in-text";
 
 /**
  * Sign-in with a NEAR wallet (NEP-413). The server hands out a one-time nonce; the wallet signs
@@ -10,7 +11,7 @@ import { viewAccessKeys } from "../near/rpc";
  * full-access key of the account. Nothing is sent on chain.
  */
 
-export const SIGN_IN_MESSAGE = "Sign in to VANA. This proves you own this account. It sends no transaction and costs nothing.";
+export { SIGN_IN_MESSAGE };
 const NONCE_TTL_MS = 5 * 60_000;
 /** 2^31 + 413: prefix that keeps a signed message from ever being a valid transaction. */
 const TAG = 2 ** 31 + 413;
@@ -30,14 +31,22 @@ export type SignedMessage = {
 
 export class SignInError extends Error {}
 
-export async function verifySignIn(s: SignedMessage, recipient: string, network: Network): Promise<string> {
-  const stored = kv.get<string>(`nep413:${s.nonce}`);
+/**
+ * Spends a challenge nonce: it must have been handed out for `recipient` and not used yet.
+ * Returns its 32 bytes. Shared by NEAR (NEP-413) and Ethereum (EIP-191) sign-in.
+ */
+export function takeNonce(nonceB64: string, recipient: string): Buffer {
+  const stored = kv.get<string>(`nep413:${nonceB64}`);
   if (stored !== recipient) throw new SignInError("Sign-in request expired. Try again.");
   // One use only.
-  kv.delete(`nep413:${s.nonce}`);
-
-  const nonce = Buffer.from(s.nonce, "base64");
+  kv.delete(`nep413:${nonceB64}`);
+  const nonce = Buffer.from(nonceB64, "base64");
   if (nonce.length !== 32) throw new SignInError("Bad nonce.");
+  return nonce;
+}
+
+export async function verifySignIn(s: SignedMessage, recipient: string, network: Network): Promise<string> {
+  const nonce = takeNonce(s.nonce, recipient);
   const key = parseKey(s.publicKey);
   const sig = decodeSignature(s.signature);
   const hash = createHash("sha256").update(payload(SIGN_IN_MESSAGE, nonce, recipient)).digest();
