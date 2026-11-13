@@ -101,8 +101,48 @@ function createStore() {
 
 export const installStore = createStore();
 
-/** iPhone and iPad (iPadOS reports itself as a Mac with touch). */
-export function isIos(): boolean {
-  const ua = navigator.userAgent;
-  return /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+/** Which install steps to show, from the browser's user agent and touch points. */
+export type Guide =
+  /** An app's built-in browser (MetaMask, Telegram, Instagram, X…): it can't install; open a real browser first. */
+  | { kind: "in-app"; os: "ios" | "android" | "other" }
+  | { kind: "ios-safari" }
+  /** Chrome, Edge or Firefox on iPhone/iPad (iOS 16.4+ lets them add to the home screen). */
+  | { kind: "ios-browser"; name: string }
+  | { kind: "android"; browser: "samsung" | "firefox" | "edge" | "chrome" }
+  | { kind: "mac-safari" }
+  | { kind: "desktop-firefox" }
+  | { kind: "desktop"; browser: "edge" | "chrome" };
+
+/** Apps whose built-in browsers can't add to the home screen. */
+const IN_APP =
+  /FBAN|FBAV|FB_IAB|Instagram|Line\/|Twitter|Snapchat|TikTok|musical_ly|BytedanceWebview|MicroMessenger|LinkedInApp|Telegram|Discord|MetaMask|Trust\/|TrustWallet|imToken|TokenPocket|Phantom|OKApp|Bitget|CoinbaseWallet|HOT ?Wallet/i;
+
+export function guideFor(ua: string, touchPoints = 0): Guide {
+  // iPadOS reports itself as a Mac, but with a touch screen.
+  const ios = /iphone|ipad|ipod/i.test(ua) || (/Macintosh/.test(ua) && touchPoints > 1);
+  const android = /Android/i.test(ua);
+  // Built-in browsers: named in the agent, an Android WebView ("; wv)"), or on iOS a web view
+  // without the "Safari/" token every real iOS browser sends.
+  if (IN_APP.test(ua) || (android && /; wv\)/.test(ua)) || (ios && !/Safari\//.test(ua))) {
+    return { kind: "in-app", os: ios ? "ios" : android ? "android" : "other" };
+  }
+  if (ios) {
+    if (/CriOS/.test(ua)) return { kind: "ios-browser", name: "Chrome" };
+    if (/EdgiOS/.test(ua)) return { kind: "ios-browser", name: "Edge" };
+    if (/FxiOS/.test(ua)) return { kind: "ios-browser", name: "Firefox" };
+    return { kind: "ios-safari" };
+  }
+  if (android) {
+    if (/SamsungBrowser/.test(ua)) return { kind: "android", browser: "samsung" };
+    if (/Firefox\//.test(ua)) return { kind: "android", browser: "firefox" };
+    if (/EdgA\//.test(ua)) return { kind: "android", browser: "edge" };
+    return { kind: "android", browser: "chrome" };
+  }
+  if (/Firefox\//.test(ua)) return { kind: "desktop-firefox" };
+  if (/Edg\//.test(ua)) return { kind: "desktop", browser: "edge" };
+  if (/Macintosh/.test(ua) && /Safari\//.test(ua) && !/Chrome|Chromium/.test(ua)) return { kind: "mac-safari" };
+  return { kind: "desktop", browser: "chrome" };
 }
+
+/** The guide for this browser. */
+export const currentGuide = (): Guide => guideFor(navigator.userAgent, navigator.maxTouchPoints);
