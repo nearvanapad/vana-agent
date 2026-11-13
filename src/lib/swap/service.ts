@@ -645,6 +645,30 @@ async function sentSwapOn(id: string, account: string, txHash: string | null): P
   return refreshSwap(id, account);
 }
 
+/**
+ * The wallet stopped while the payment may have gone through. An Intents swap is found by its
+ * deposit address, so it is followed as if submitted. A pool swap can't be found without its
+ * transaction hash: it stops here, telling the user to check their wallet, and can't be approved
+ * again (that could pay twice).
+ */
+export function unsureSwap(id: string, account: string): Promise<SwapView> {
+  return onSwap(id, account, async () => {
+    const row = load(id, account);
+    if (row.status !== "signing") throw new SwapError(`This swap is ${row.status}, not waiting for a signature.`);
+    // A deposit swap's wallet step only registers the account: nothing was paid, approve again.
+    if (stored(row).proposal.pay === "deposit") return rejectSwap(id, account);
+    if (row.route === "intents" && row.deposit_address) {
+      update(id, { status: "submitted", tx_hash: null });
+      return refreshSwapOn(id, account);
+    }
+    update(id, {
+      status: "failed",
+      result: JSON.stringify({ reason: "The wallet stopped while sending the swap, so it may have gone through. Check your wallet's history before swapping again." }),
+    });
+    return view(load(id, account));
+  });
+}
+
 /** The wallet was closed or refused: the proposal can be approved again until it expires. */
 export function rejectSwap(id: string, account: string, failed?: { txHash?: string; reason: string }): SwapView {
   const row = load(id, account);
@@ -685,10 +709,13 @@ async function refreshSwapOn(id: string, account: string): Promise<SwapView> {
         s.status === "SUCCESS" ? "success" : s.status === "REFUNDED" ? "refunded" : s.status === "FAILED" ? "failed" : "processing";
       // Nothing has arrived at a deposit swap's address yet: keep waiting until well past its deadline,
       // also when the user said they sent it.
+      const deadline = Date.parse(storedQuote(row)?.deadline ?? "");
+      const over = s.status === "PENDING_DEPOSIT" && Number.isFinite(deadline) && Date.now() > deadline + DEPOSIT_GRACE_MS;
       if (s.status === "PENDING_DEPOSIT" && stored(row).proposal.pay === "deposit") {
-        const deadline = Date.parse(storedQuote(row)?.deadline ?? "");
-        const over = Number.isFinite(deadline) && Date.now() > deadline + DEPOSIT_GRACE_MS;
         status = over ? "expired" : waiting ? "awaiting_deposit" : "processing";
+      } else if (over) {
+        // Paid from the wallet, yet nothing arrived (the wallet stopped before paying, say): stop tracking.
+        status = "failed";
       }
       update(id, {
         status,
@@ -699,6 +726,7 @@ async function refreshSwapOn(id: string, account: string): Promise<SwapView> {
           refunded: d?.refundedAmount && d.refundedAmount !== "0" ? d.refundedAmountFormatted : null,
           reason:
             d?.refundReason ??
+            (status === "failed" && s.status === "PENDING_DEPOSIT" ? "Nothing arrived at the deposit address, so nothing was swapped." : null) ??
             (s.status === "INCOMPLETE_DEPOSIT" ? "Less than the quoted amount arrived. Send the rest before the deadline, or what arrived is refunded." : null),
           dest_tx_url: d?.destinationChainTxHashes?.[0]?.explorerUrl ?? null,
           origin_tx_url: d?.originChainTxHashes?.[0]?.explorerUrl ?? null,

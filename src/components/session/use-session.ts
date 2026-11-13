@@ -32,16 +32,19 @@ export function useSession() {
 
   const signIn = useMutation({
     mutationFn: async () => {
-      const c = await fetch("/api/session", { method: "POST", body: JSON.stringify({ step: "challenge" }) }).then((r) =>
-        json<{ message: string; recipient: string; nonce: string }>(r),
-      );
-      const verify = (body: object) => fetch("/api/session", { method: "POST", body: JSON.stringify(body) }).then((r) => json<SessionInfo>(r));
-      // A `0x…` account (Ethereum Wallets) can't sign NEP-413: its extension signs EIP-191 instead.
-      const account = await restoreAccount();
+      const post = (body: object) => fetch("/api/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+      // Both at once: popup blockers allow a wallet window only soon after the click.
+      const [c, account] = await Promise.all([
+        post({ step: "challenge" }).then((r) => json<{ message: string; recipient: string; uri: string; nonce: string }>(r)),
+        restoreAccount(),
+      ]);
+      const verify = (body: object) => post(body).then((r) => json<SessionInfo>(r));
+      // A `0x…` account (Ethereum Wallets) can't sign NEP-413: it signs in with Ethereum instead.
       if (isEthAccount(account)) {
-        const text = ethSignInText({ account, network: WALLET.id, recipient: c.recipient, nonce: c.nonce });
+        const issuedAt = new Date().toISOString();
+        const text = ethSignInText({ account, network: WALLET.id, domain: c.recipient, uri: c.uri, nonce: c.nonce, issuedAt });
         const signature = await ethPersonalSign(account, text);
-        return verify({ step: "verify-eth", accountId: account, signature, nonce: c.nonce });
+        return verify({ step: "verify-eth", accountId: account, signature, nonce: c.nonce, issuedAt });
       }
       const nonce = Uint8Array.from(atob(c.nonce), (ch) => ch.charCodeAt(0));
       const signed = await signMessage(c.message, c.recipient, nonce);

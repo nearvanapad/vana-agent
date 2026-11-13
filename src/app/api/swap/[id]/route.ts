@@ -2,13 +2,14 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { readSession } from "@/lib/auth/session";
 import { SwapError } from "@/lib/swap/assets";
-import { approveSwap, refreshSwap, rejectSwap, sentSwap, submitSwap, unwrappedSwap, unwrapSwap } from "@/lib/swap/service";
+import { approveSwap, refreshSwap, rejectSwap, sentSwap, submitSwap, unsureSwap, unwrappedSwap, unwrapSwap } from "@/lib/swap/service";
+import { crossSite } from "@/lib/http/same-site";
 
 /**
  * One proposed swap, for the signed-in wallet that it was proposed to.
  * GET: its state (asks 1Click or the chain while it settles).
  * POST approve: real quote + the transactions to sign (none for a deposit swap, which gets its deposit address).
- * POST submitted / rejected / failed: what the wallet did. POST sent: the user sent a deposit swap's transfer.
+ * POST submitted / rejected / failed / unsure: what the wallet did (unsure: it stopped partway, maybe after paying). POST sent: the user sent a deposit swap's transfer.
  * POST unwrap: the transaction that turns the wNEAR a finished swap paid out into NEAR; unwrapped: it was signed.
  */
 
@@ -19,6 +20,7 @@ const Action = z.discriminatedUnion("action", [
   z.object({ action: z.literal("unwrap") }),
   z.object({ action: z.literal("unwrapped"), txHash: z.string().regex(/^[1-9A-HJ-NP-Za-km-z]{32,64}$/).nullable() }),
   z.object({ action: z.literal("rejected") }),
+  z.object({ action: z.literal("unsure") }),
   z.object({ action: z.literal("failed"), txHash: z.string().max(64).optional(), reason: z.string().max(300) }),
 ]);
 
@@ -45,6 +47,8 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/swap/[id]">
 }
 
 export async function POST(req: NextRequest, ctx: RouteContext<"/api/swap/[id]">) {
+  const refused = crossSite(req);
+  if (refused) return refused;
   const { id } = await ctx.params;
   const who = await account();
   if (!who) return Response.json({ error: "Sign in with your wallet to approve swaps." }, { status: 401 });
@@ -63,6 +67,8 @@ export async function POST(req: NextRequest, ctx: RouteContext<"/api/swap/[id]">
         return Response.json(await unwrapSwap(id, who));
       case "unwrapped":
         return Response.json({ swap: unwrappedSwap(id, who, a.txHash) });
+      case "unsure":
+        return Response.json({ swap: await unsureSwap(id, who) });
       case "rejected":
         return Response.json({ swap: rejectSwap(id, who) });
       case "failed":

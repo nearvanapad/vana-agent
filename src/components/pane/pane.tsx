@@ -75,11 +75,35 @@ function Body({ mode, grab, title }: { mode: Mode; grab?: (e: React.PointerEvent
   );
 }
 
+/** How long the pane takes to animate out (globals.css, .m-panel and .m-float). */
+const LEAVE_MS = 180;
+
+/**
+ * Whether something that is `on` should still show: it stays a moment after it turns off, so it
+ * can animate out. Only when the pane closes; moving it between docked and detached is instant.
+ */
+function useLeaving(on: boolean): boolean {
+  const closing = !usePane().open;
+  const [shown, setShown] = useState(on);
+  useEffect(() => {
+    if (on) return setShown(true);
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const t = setTimeout(() => setShown(false), closing && !reduce ? LEAVE_MS : 0);
+    return () => clearTimeout(t);
+  }, [on, closing]);
+  return on || (shown && closing);
+}
+
 /** The pane as a column beside the chat, full height, on wide screens. */
 export function PaneDocked() {
-  if (usePaneMode() !== "inline") return null;
+  const on = usePaneMode() === "inline";
+  if (!useLeaving(on)) return null;
   return (
-    <aside className="n-fade flex h-dvh w-[440px] shrink-0 flex-col overflow-hidden border-l border-line bg-surface/30" aria-label="Side pane">
+    <aside
+      data-state={on ? "open" : "closed"}
+      className="m-panel flex h-dvh w-[440px] shrink-0 flex-col overflow-hidden border-l border-line bg-surface/30"
+      aria-label="Side pane"
+    >
       <Body mode="inline" />
     </aside>
   );
@@ -133,7 +157,7 @@ function savedBox(): Box {
 }
 
 /** The detached pane: a window over the page, dragged by its header and resized from its corner. */
-function Floating() {
+function Floating({ on }: { on: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const [box, setBox] = useState<Box>(savedBox);
   const boxRef = useRef(box);
@@ -192,6 +216,7 @@ function Floating() {
       ref={ref}
       role="dialog"
       aria-label="Token checks and swaps"
+      data-state={on ? "open" : "closed"}
       className="m-float fixed z-30 resize overflow-hidden rounded-card border border-line bg-bg shadow-2xl shadow-void/60"
       style={{ left: box.x, top: box.y, width: box.w, height: box.h, minWidth: MIN_W, minHeight: MIN_H }}
     >
@@ -204,7 +229,8 @@ function Floating() {
 export function PaneOverlay() {
   const pane = usePane();
   const mode = usePaneMode();
-  if (mode === "float") return <Floating />;
+  const floating = useLeaving(mode === "float");
+  if (floating) return <Floating on={mode === "float"} />;
   if (pane.docked) return null;
   return (
     // Not modal, so the header and the tab bar stay usable while it is open.

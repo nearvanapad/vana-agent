@@ -2,7 +2,9 @@
 
 import type { NearConnector, NearWalletBase } from "@hot-labs/near-connect";
 import { NETWORK, RPC_URL } from "./config";
-import { oneActionEach, outcomesPerTx, type WalletTx } from "./tx";
+import { oneActionEach, outcomesPerTx, PartlySent, REFUSED, stoppedAt, type WalletTx } from "./tx";
+
+export { PartlySent };
 
 export type { WalletTx };
 
@@ -63,23 +65,30 @@ const SINGLE_ACTION = ["ethereum-wallets"];
  * Sign and send in order. Multi-action transactions are split for SINGLE_ACTION wallets, with
  * one outcome per original transaction still returned. Wallets that can't batch get one approval per transaction;
  * a transaction that fails on chain stops the rest (later ones depend on it).
+ * Throws PartlySent when the wallet stops after something went through; any other error means nothing did.
  */
 export async function sendTransactions(txs: WalletTx[]): Promise<FinalExecutionOutcome[]> {
   const w: NearWalletBase = await (await getConnector()).wallet();
-  if (SINGLE_ACTION.includes(w.manifest.id) && txs.some((t) => t.actions.length > 1)) {
+  if (SINGLE_ACTION.includes(w.manifest.id)) {
     const { parts, owner } = oneActionEach(txs);
-    return outcomesPerTx(owner, await sendAll(w, parts), failedOnChain);
+    try {
+      return outcomesPerTx(owner, await w.signAndSendTransactions({ network: NETWORK, transactions: parts }), failedOnChain);
+    } catch (e) {
+      throw stoppedAt(e, parts.length);
+    }
   }
-  return sendAll(w, txs);
-}
-
-async function sendAll(w: NearWalletBase, txs: WalletTx[]): Promise<FinalExecutionOutcome[]> {
   if (txs.length > 1 && w.manifest.features?.signAndSendTransactions === false) {
     const out: FinalExecutionOutcome[] = [];
-    for (const t of txs) {
-      const o = await w.signAndSendTransaction({ network: NETWORK, ...t });
-      out.push(o);
-      if (failedOnChain(o)) break;
+    for (const [i, t] of txs.entries()) {
+      try {
+        out.push(await w.signAndSendTransaction({ network: NETWORK, ...t }));
+      } catch (e) {
+        if (i === 0) throw e;
+        // The ones before went through; this one may have too unless the user turned it down.
+        const msg = e instanceof Error ? e.message : String(e);
+        throw new PartlySent(msg, i === txs.length - 1 && !REFUSED.test(msg));
+      }
+      if (failedOnChain(out[i]!)) break;
     }
     return out;
   }

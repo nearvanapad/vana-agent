@@ -35,7 +35,7 @@ NEAR Intents has no testnet, so what works depends on the network picked in the 
 - **NEAR AI Cloud:** chat in TEEs, three privacy tiers, and every reply's signature and attestation verified (`src/lib/agent/verify.ts`).
 - **NEAR Intents:** through 1Click, or Aurora's Swap API in front of the same solvers (the live site uses Aurora; see `INTENTS_PROVIDER` below). Swaps between NEAR tokens and across chains, with deposit addresses for BTC, ETH, SOL and more, and status tracking through to success, refund or failure (`src/lib/swap/service.ts`).
 - **NEP-413:** wallet sign-in with nothing sent on chain (`src/lib/auth/nep413.ts`).
-- **Ethereum wallets (NEP-518):** `0x…` NEAR accounts connect through near-connect's Ethereum Wallets and sign in with EIP-191 `personal_sign`, checked on the server (`src/lib/auth/eth.ts`). Their swaps go one action per transaction.
+- **Ethereum wallets (NEP-518):** `0x…` NEAR accounts connect through near-connect's Ethereum Wallets and sign in with Ethereum (EIP-4361 over `personal_sign`), checked on the server (`src/lib/auth/eth.ts`). Signing in needs a wallet in the browser: an extension on desktop, or the browser inside the MetaMask or Rabby app on a phone. Through WalletConnect it connects but can't sign in yet, so it can't swap here either. Their swaps go one action per transaction; if the wallet stops partway after the payment may have gone out, the swap is followed or flagged instead of offered again.
 - **NEAR RPC, FastNEAR, NearBlocks, Rhea:** the chain data behind the seven checks (`src/lib/risk/`).
 
 Safeguards:

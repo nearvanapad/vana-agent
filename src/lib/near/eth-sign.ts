@@ -3,8 +3,8 @@
 /**
  * Ethereum sign-in on this page. NEAR accounts controlled by an Ethereum key (`0x…`) connect
  * through near-connect's "Ethereum Wallets", which can send transactions but can't sign
- * messages. To sign in, VANA asks the browser's Ethereum extension directly for a
- * `personal_sign` (EIP-191), and the server recovers the address (lib/auth/eth.ts).
+ * messages. To sign in, VANA asks the browser's Ethereum extension directly to sign a Sign-In with
+ * Ethereum message (`personal_sign`), and the server recovers the address (lib/auth/eth.ts).
  */
 
 type Eip1193 = { request(args: { method: string; params?: unknown[] }): Promise<unknown> };
@@ -78,7 +78,13 @@ async function holds(w: EthWallet, address: string): Promise<boolean> {
 /** Signs `text` with `personal_sign` from the extension that holds `address` (lowercase `0x…`). */
 export async function ethPersonalSign(address: string, text: string): Promise<string> {
   const wallets = await discover();
-  if (!wallets.length) throw new Error("Signing in with an Ethereum account needs a browser wallet extension, such as MetaMask or Rabby.");
+  // Ethereum Wallets can connect through WalletConnect, but only an extension (or a wallet's own
+  // browser) can sign the sign-in message here.
+  if (!wallets.length) {
+    throw new Error(
+      "Signing in with an Ethereum account needs a wallet in this browser: an extension such as MetaMask or Rabby on desktop, or the browser inside the MetaMask or Rabby app on a phone. WalletConnect can't sign in yet.",
+    );
+  }
 
   // An extension that already has this site and account connected signs without another prompt.
   const ready = await Promise.all(wallets.map((w) => holds(w, address)));

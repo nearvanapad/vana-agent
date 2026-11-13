@@ -1,15 +1,17 @@
 import { secp256k1 } from "@noble/curves/secp256k1.js";
 import { keccak_256 } from "@noble/hashes/sha3.js";
 import type { Network } from "../near/network";
+import { onNetwork } from "../near/network-server";
+import { RpcError, viewAccessKeys } from "../near/rpc";
 import { SignInError, takeNonce } from "./nep413";
 import { ethSignInText, isEthAccount } from "./sign-in-text";
 
 /**
- * Sign-in with an Ethereum wallet (EIP-191 `personal_sign`), for NEAR accounts controlled by an
- * Ethereum key (`0x…`, NEP-518). Those accounts have no ed25519 key, so NEP-413 can't work. The
- * wallet signs a text naming the account, network, site and a one-time nonce; the server recovers
- * the signer's address and checks it is the account. Whoever holds that key controls the account,
- * so nothing is read on chain. Plain keys (EOAs) only: contract wallets (EIP-1271) can't sign in.
+ * Sign-in with an Ethereum wallet (Sign-In with Ethereum, EIP-4361, over `personal_sign`), for NEAR
+ * accounts controlled by an Ethereum key (`0x…`, NEP-518). Those accounts have no ed25519 key, so
+ * NEP-413 can't work. The wallet signs a message naming the site, account, network and a one-time
+ * nonce; the server recovers the signer's address and checks it is the account. Plain keys (EOAs)
+ * only: contract wallets (EIP-1271) can't sign in.
  */
 
 export type EthSignedMessage = {
@@ -18,7 +20,12 @@ export type EthSignedMessage = {
   /** `0x` + r ‖ s ‖ v, 65 bytes. */
   signature: string;
   nonce: string;
+  /** When the browser wrote the message, ISO 8601. */
+  issuedAt: string;
 };
+
+/** How far the message's time may be from the server's: the nonce only lives 5 minutes anyway. */
+const SKEW_MS = 10 * 60_000;
 
 const utf8 = new TextEncoder();
 
@@ -57,11 +64,27 @@ export function recoverAddress(hash: Uint8Array, signature: string): string {
   return addressOf(point.toBytes(false));
 }
 
-export function verifyEthSignIn(s: EthSignedMessage, recipient: string, network: Network): string {
-  takeNonce(s.nonce, recipient);
+/**
+ * `site` is the host the challenge was given for and the origin the page runs on.
+ * Returns the account, lowercase.
+ */
+export async function verifyEthSignIn(s: EthSignedMessage, site: { domain: string; uri: string }, network: Network): Promise<string> {
+  takeNonce(s.nonce, site.domain);
   const account = s.accountId.trim().toLowerCase();
   if (!isEthAccount(account)) throw new SignInError("Not an Ethereum account.");
-  const text = ethSignInText({ account, network: network.id, recipient, nonce: s.nonce });
+  const at = Date.parse(s.issuedAt);
+  if (!Number.isFinite(at) || Math.abs(Date.now() - at) > SKEW_MS) throw new SignInError("Your clock is off, or the request is old. Try again.");
+  const text = ethSignInText({ account, network: network.id, domain: site.domain, uri: site.uri, nonce: s.nonce, issuedAt: s.issuedAt });
   if (recoverAddress(eip191Hash(text), s.signature) !== account) throw new SignInError("The signature does not match this account, site or network.");
+
+  // Accounts made before NEAR kept this shape for Ethereum keys could belong to a NEAR key.
+  // An Ethereum-key account has no full-access key, so one that has one isn't the signer's.
+  const keys = await onNetwork(network, () => viewAccessKeys(account)).catch((e: unknown) => {
+    if (e instanceof RpcError && e.kind === "UNKNOWN_ACCOUNT") return [];
+    throw new SignInError("Couldn't read the account on NEAR. Try again.");
+  });
+  if (keys.some((k) => k.access_key.permission === "FullAccess")) {
+    throw new SignInError(`${account} is controlled by a NEAR key, not an Ethereum one. Sign in with that NEAR wallet.`);
+  }
   return account;
 }

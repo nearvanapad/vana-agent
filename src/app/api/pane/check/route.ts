@@ -5,6 +5,7 @@ import { readSession } from "@/lib/auth/session";
 import { allow } from "@/lib/chat/rate-limit";
 import { access, denied } from "@/lib/gate/access";
 import { normalizeToken } from "@/lib/risk/report";
+import { crossSite } from "@/lib/http/same-site";
 
 /**
  * A risk check the user started from the side pane, without the chat. Streams NDJSON: one line
@@ -14,6 +15,8 @@ import { normalizeToken } from "@/lib/risk/report";
 const Body = z.object({ token: z.string().min(2).max(80), fresh: z.boolean().optional() });
 
 export async function POST(req: Request) {
+  const refused = crossSite(req);
+  if (refused) return refused;
   const s = await readSession();
   if (!s) return Response.json({ error: "No session. Reload the page." }, { status: 401 });
   const a = await access(s.account);

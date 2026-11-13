@@ -399,6 +399,21 @@ body {
   transform-origin: top right;
   animation: m-pop-in 0.18s cubic-bezier(0.2, 0.8, 0.25, 1);
 }
+.m-float[data-state="closed"] {
+  animation: m-pop-out 0.18s ease-in forwards;
+  pointer-events: none;
+}
+/* The docked pane column: fades in, slides a little and fades out (kept mounted for it in pane.tsx). */
+@keyframes m-panel-out {
+  to { opacity: 0; transform: translateX(24px); }
+}
+.m-panel[data-state="open"] {
+  animation: n-fade 0.25s ease-out;
+}
+.m-panel[data-state="closed"] {
+  animation: m-panel-out 0.18s ease-in forwards;
+  pointer-events: none;
+}
 
 /* Moving between pages (React <ViewTransition>, see the page files): the old page fades, the new one rises in. */
 ::view-transition {
@@ -420,7 +435,8 @@ body {
   .m-drawer-right,
   .m-drawer-left,
   .m-rise,
-  .m-float {
+  .m-float,
+  .m-panel {
     animation: none !important;
   }
   ::view-transition-old(*),

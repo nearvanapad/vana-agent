@@ -4,6 +4,7 @@ import { allow } from "@/lib/chat/rate-limit";
 import { CONVERSATION_ID, ownsConversation } from "@/lib/chat/store";
 import { SwapError } from "@/lib/swap/assets";
 import { proposeSwap } from "@/lib/swap/service";
+import { crossSite } from "@/lib/http/same-site";
 
 /**
  * A swap the user filled in by hand in the side pane: the same approval card the chat makes,
@@ -21,6 +22,8 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
+  const refused = crossSite(req);
+  if (refused) return refused;
   const s = await readSession();
   if (!s?.account) return Response.json({ error: "Sign in with your wallet to swap." }, { status: 401 });
   if (!allow(s.id)) return Response.json({ error: "Too many requests. Wait a minute and try again." }, { status: 429 });

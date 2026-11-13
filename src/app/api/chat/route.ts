@@ -19,6 +19,7 @@ import { CONVERSATION_ID, ensureConversation, loadMessages, NotYours, saveMessag
 import { allow, allowToday, ipOf } from "@/lib/chat/rate-limit";
 import { CHAT_PER_DAY } from "@/lib/chat/limits";
 import { access, denied } from "@/lib/gate/access";
+import { crossSite } from "@/lib/http/same-site";
 
 const Id = z.string().max(120).regex(/^[A-Za-z0-9._:-]+$/);
 const Body = z.object({
@@ -46,6 +47,8 @@ const MAX_INPUT = 4000;
 const HISTORY = 30;
 
 export async function POST(req: Request) {
+  const refused = crossSite(req);
+  if (refused) return refused;
   if (!llmConfigured()) return Response.json({ error: "The AI model is not configured on this server (LLM_API_KEY)." }, { status: 503 });
   const s = await readSession();
   if (!s) return Response.json({ error: "No session. Reload the page." }, { status: 401 });

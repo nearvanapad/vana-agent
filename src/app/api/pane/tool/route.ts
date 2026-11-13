@@ -5,6 +5,7 @@ import { buildTools } from "@/lib/agent/tools";
 import { readSession } from "@/lib/auth/session";
 import { allow } from "@/lib/chat/rate-limit";
 import { access, denied } from "@/lib/gate/access";
+import { crossSite } from "@/lib/http/same-site";
 
 /** Read-only tools the side pane runs directly: token search, swap quotes and the launch screen. Quotes are open to all; the rest are for holders. */
 
@@ -12,6 +13,8 @@ const PANE_TOOLS = ["search_token", "quote_swap", "find_tokens"] as const;
 const Body = z.object({ name: z.enum(PANE_TOOLS), args: z.record(z.string(), z.unknown()) });
 
 export async function POST(req: Request) {
+  const refused = crossSite(req);
+  if (refused) return refused;
   const s = await readSession();
   if (!s) return Response.json({ error: "No session. Reload the page." }, { status: 401 });
   if (!allow(s.id)) return Response.json({ error: "Too many requests. Wait a minute and try again." }, { status: 429 });

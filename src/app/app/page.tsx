@@ -11,12 +11,10 @@ export const generateMetadata = () =>
 
 export default function App() {
   return (
-    // Rises in from the landing page (globals.css, `.page`). The app itself loads in the browser
-    // after that, so it fades in once it arrives too.
+    // Rises in from the landing page (globals.css, `.page`). The app itself fades in when it
+    // arrives (client.tsx).
     <ViewTransition enter="page" exit="page" default="none">
-      <div className="n-fade">
-        <ChatAppClient />
-      </div>
+      <ChatAppClient />
     </ViewTransition>
   );
 }

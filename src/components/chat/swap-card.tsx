@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { AlertTriangle, Check, CheckCircle2, Copy, ExternalLink, Loader2, Send, Undo2, Wallet, XCircle } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
-import { failedOnChain, sendTransactions, type WalletTx } from "@/lib/near/wallet";
+import { failedOnChain, PartlySent, sendTransactions, type WalletTx } from "@/lib/near/wallet";
 import { chainName } from "@/lib/swap/chains";
 import { swapRisk, type SwapRisk } from "@/lib/swap/risk";
 import type { Proposal, SwapQuote, SwapView } from "@/lib/swap/service";
@@ -181,9 +181,18 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
       try {
         outcomes = (await sendTransactions(txs)) as Outcome[];
       } catch (e) {
+        // The payment may have gone out: follow the swap instead of offering to pay again.
+        if (e instanceof PartlySent && e.paidMaybe) {
+          const r = await post<{ swap: SwapView }>(proposal.id, { action: "unsure" }).catch(() => null);
+          if (r) return void qc.setQueryData(key, r.swap);
+          throw new Error("The wallet stopped while sending the swap, so it may have gone through. Check your wallet's history before swapping again.");
+        }
         const r = await post<{ swap: SwapView }>(proposal.id, { action: "rejected" }).catch(() => null);
         if (r) qc.setQueryData(key, r.swap);
         const msg = e instanceof Error ? e.message : String(e);
+        if (e instanceof PartlySent) {
+          throw new Error("The wallet stopped before the payment, so nothing was swapped. The steps before it went through, and approving again skips them.");
+        }
         throw new Error(/reject|cancel|closed|denied/i.test(msg) ? "You closed the wallet. Nothing was sent." : `The wallet said: ${msg}`);
       }
       const last = outcomes[outcomes.length - 1];
@@ -471,6 +480,7 @@ function Unwrap({ swap }: { swap: SwapView }) {
         outcomes = (await sendTransactions(txs)) as Outcome[];
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
+        if (e instanceof PartlySent) throw new Error("The wallet stopped partway. Check your NEAR and wNEAR balances before trying again.");
         throw new Error(/reject|cancel|closed|denied/i.test(msg) ? "You closed the wallet. Your wNEAR is still there." : `The wallet said: ${msg}`);
       }
       const last = outcomes[outcomes.length - 1];

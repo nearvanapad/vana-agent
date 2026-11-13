@@ -2,12 +2,16 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { Wallet } from "lucide-react";
-import { useSyncExternalStore } from "react";
+import { useRef, useSyncExternalStore } from "react";
 import { ethPicker } from "@/lib/near/eth-sign";
 
 /** Asks which extension should sign, when several are installed and none has this site connected. */
 export function EthWalletPicker() {
   const pick = useSyncExternalStore(ethPicker.subscribe, ethPicker.get, () => null);
+  // The list stays while the dialog animates out, after the choice cleared it.
+  const last = useRef(pick);
+  if (pick) last.current = pick;
+  const shown = last.current;
   return (
     <Dialog.Root open={!!pick} onOpenChange={(o) => !o && pick?.choose(null)}>
       <Dialog.Portal>
@@ -18,11 +22,11 @@ export function EthWalletPicker() {
               <Dialog.Description className="text-sm text-pretty text-text-2">Pick the extension that holds your Ethereum account.</Dialog.Description>
             </div>
             <ul className="flex flex-col gap-2">
-              {pick?.wallets.map((w) => (
+              {shown?.wallets.map((w) => (
                 <li key={w.id}>
                   <button
                     type="button"
-                    onClick={() => pick.choose(w)}
+                    onClick={() => pick?.choose(w)}
                     className="flex w-full items-center gap-3 rounded-well bg-surface-2 px-3 py-2.5 text-left text-sm hover:bg-surface-2/70"
                   >
                     {w.icon ? <img src={w.icon} alt="" width={24} height={24} className="size-6 rounded-md" /> : <Wallet size={20} className="text-text-2" />}

@@ -75,3 +75,37 @@ export function outcomesPerTx<T>(owner: number[], outcomes: T[], failed: (o: T) 
   }
   return out.filter((x) => x !== undefined);
 }
+
+/**
+ * The wallet stopped after some of the transactions went through. `paidMaybe`: the last one (the
+ * payment, in a swap) may have gone through too, so the caller must not offer to pay again.
+ */
+export class PartlySent extends Error {
+  constructor(
+    message: string,
+    readonly paidMaybe: boolean,
+  ) {
+    super(message);
+    this.name = "PartlySent";
+  }
+}
+
+export const REFUSED = /reject|denied|cancel|declin/i;
+
+/**
+ * What an Ethereum Wallets error says went through, out of `total` one-action transactions. Its
+ * signing page reports "k of n requested transactions completed", with the Ethereum hash when the
+ * next one was submitted but its result is unknown or failed. A closed or timed-out window can't
+ * tell, so it is taken as maybe paid.
+ */
+export function stoppedAt(e: unknown, total: number): Error {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/check submitted transactions/i.test(msg)) return new PartlySent(msg, true);
+  const m = /^(\d+) of (\d+) requested transactions completed/.exec(msg);
+  if (!m) return e instanceof Error ? e : new Error(msg);
+  const done = Number(m[1]);
+  const submitted = /Ethereum hash: 0x[0-9a-f]{64}/i.test(msg);
+  if (done === 0 && !submitted) return new Error(msg);
+  // The one that stopped is number `done`; the payment is the last.
+  return new PartlySent(msg, submitted && done === total - 1);
+}

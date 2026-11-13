@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { call, oneActionEach, outcomesPerTx, type WalletTx } from "./tx";
+import { call, oneActionEach, outcomesPerTx, PartlySent, stoppedAt, type WalletTx } from "./tx";
 
 const reg = call("storage_deposit", {}, 10, "1");
 const wrap = call("near_deposit", {}, 10, "5");
@@ -61,5 +61,30 @@ describe("one action per transaction", () => {
       { id: "b", ok: true },
     ];
     assert.equal(outcomesPerTx(owner, outs, failed).length, 1);
+  });
+});
+
+describe("what an Ethereum Wallets error says went through", () => {
+  const hash = `0x${"ab".repeat(32)}`;
+  const paid = (e: Error) => (e instanceof PartlySent ? e.paidMaybe : null);
+
+  it("nothing, when the first one is turned down or never starts", () => {
+    assert.equal(paid(stoppedAt(new Error("0 of 4 requested transactions completed. User rejected the request."), 4)), null);
+    assert.equal(paid(stoppedAt(new Error("Popup blocked. Allow popups and try again."), 4)), null);
+    assert.equal(paid(stoppedAt(new Error("Invalid signer; reconnect your wallet"), 4)), null);
+  });
+
+  it("some steps but not the payment", () => {
+    assert.equal(paid(stoppedAt(new Error("2 of 4 requested transactions completed. User rejected the request."), 4)), false);
+    assert.equal(paid(stoppedAt(new Error(`2 of 4 requested transactions completed. Timed out. Ethereum hash: ${hash}. Check its status before retrying.`), 4)), false);
+    assert.equal(paid(stoppedAt(new Error("3 of 4 requested transactions completed. User rejected the request."), 4)), false);
+    assert.equal(paid(stoppedAt(new Error(`0 of 4 requested transactions completed. NEAR execution failed. Ethereum hash: ${hash}.`), 4)), false);
+  });
+
+  it("maybe the payment", () => {
+    assert.equal(paid(stoppedAt(new Error(`3 of 4 requested transactions completed. Timed out waiting for final NEAR outcome. Ethereum hash: ${hash}. Check its status before retrying.`), 4)), true);
+    assert.equal(paid(stoppedAt(new Error(`0 of 1 requested transactions completed. NEAR execution failed. Ethereum hash: ${hash}.`), 1)), true);
+    assert.equal(paid(stoppedAt(new Error("Wallet window closed; check submitted transactions before retrying"), 4)), true);
+    assert.equal(paid(stoppedAt(new Error("Wallet request timed out; check submitted transactions before retrying"), 4)), true);
   });
 });

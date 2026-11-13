@@ -4,12 +4,15 @@ import { allow } from "@/lib/chat/rate-limit";
 import { access, denied } from "@/lib/gate/access";
 import { normalizeToken, storedReport } from "@/lib/risk/report";
 import { WebCapError, webCheck, WEB_SEARCH } from "@/lib/risk/web";
+import { crossSite } from "@/lib/http/same-site";
 
 /** "On the web" for a token already checked in the side pane. Only when the user turned web search on. */
 
 const Body = z.object({ token: z.string().min(2).max(80) });
 
 export async function POST(req: Request) {
+  const refused = crossSite(req);
+  if (refused) return refused;
   if (!WEB_SEARCH) return Response.json({ error: "Web search isn't available on this server." }, { status: 503 });
   const s = await readSession();
   if (!s) return Response.json({ error: "No session. Reload the page." }, { status: 401 });
