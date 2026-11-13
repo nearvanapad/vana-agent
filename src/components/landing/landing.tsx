@@ -298,7 +298,7 @@ function Chapter({
   const [deep, setDeep] = useState(false);
   const afterIntro = count(title) * 0.08 + count(body) * 0.03 + 0.4;
   return (
-    <section ref={secRef} id={label} aria-label={RAIL[index]} className="relative" style={{ height: `${HEIGHTS[index]}vh`, "--p": 0, "--pp": 0.5 } as CSSProperties}>
+    <section ref={secRef} id={label} aria-label={RAIL[index]} className="relative" style={{ height: `${HEIGHTS[index]}vh`, "--p": 0 } as CSSProperties}>
       <div className="sticky top-0 flex h-svh items-center overflow-hidden py-16">
         <div
           data-fit="full"
@@ -328,7 +328,6 @@ function Chapter({
           <div
             id={`${label}-stage`}
             className={clsx("w-full justify-self-center", deep ? "max-w-[600px]" : (demoClass ?? "max-w-[560px]"))}
-            style={{ transform: "translateY(calc((0.5 - var(--pp)) * 80px))" }}
           >
             {deep ? details : children}
           </div>
@@ -423,7 +422,6 @@ export function Landing() {
         const span = b.height - vh;
         const p = span > 0 ? clamp(-b.top / span) : 0;
         el.style.setProperty("--p", p.toFixed(4));
-        el.style.setProperty("--pp", p.toFixed(4));
         const shown = (i === 0 ? heroIn : b.top < vh * 0.6) ? "1" : "0";
         if (el.dataset.in !== shown) el.dataset.in = shown;
         return { p, top: b.top };
@@ -581,7 +579,7 @@ export function Landing() {
       </nav>
 
       {/* 00 · Hero */}
-      <section ref={sec(0)} aria-label="Start" className="relative" style={{ height: `${HEIGHTS[0]}vh`, "--p": 0, "--pp": 0 } as CSSProperties}>
+      <section ref={sec(0)} aria-label="Start" className="relative" style={{ height: `${HEIGHTS[0]}vh`, "--p": 0 } as CSSProperties}>
         <div className="sticky top-0 flex h-svh items-center justify-center overflow-hidden py-16">
           <div data-fit="1" className="relative z-[1] origin-center">
             <div className="flex flex-col items-center gap-5 px-6 py-4 text-center" style={{ transform: "translateY(calc(var(--p) * -90px))" }}>
