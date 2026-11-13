@@ -194,6 +194,7 @@ export async function sponsorRegistration(token: string, account: string, deposi
       receiverId: token,
       actions: [actions.functionCall("storage_deposit", { account_id: account, registration_only: true }, GAS_TGAS * 10n ** 12n, deposit)],
     });
+    if (typeof out.status === "object" && out.status !== null && "Failure" in out.status) throw new Error("the transaction failed");
     return out.transaction.hash as string;
   } catch (e) {
     // The message may carry request details; the key is never in it, but keep it short anyway.
