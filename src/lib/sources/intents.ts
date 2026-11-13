@@ -83,6 +83,10 @@ const APP_FEES = (() => {
   }
 })();
 
+/** Our fee on 1Click quotes, when there is one to charge: what sponsored account setup is paid from. */
+export const ourFee = (): { recipient: string; fee: number; keyed: boolean } | null =>
+  PROVIDER === "oneclick" && APP_FEES?.[0] ? { ...APP_FEES[0], keyed: Boolean(process.env.ONECLICK_JWT) } : null;
+
 export type SwapAsset = {
   /** e.g. "nep141:wrap.near" */
   assetId: string;
@@ -131,6 +135,8 @@ export type QuoteRequest = {
   /** Where a failed swap is refunded: an account or address on the origin chain. */
   refundTo: string;
   deadline: Date;
+  /** Bps added to the fee we send on this quote, to pay for the user's account setup (swap/sponsor.ts); only on 1Click. */
+  extraFeeBps?: number;
 };
 
 export type Quote = {
@@ -162,7 +168,10 @@ export type QuoteResponse = {
  */
 export async function quote(r: QuoteRequest): Promise<Sourced<QuoteResponse> & { provider: Provider }> {
   const p = PROVIDER;
-  const fees = p === "oneclick" ? APP_FEES : undefined;
+  const fees =
+    p === "oneclick" && APP_FEES
+      ? APP_FEES.map((f) => ({ ...f, fee: f.fee + (r.extraFeeBps ?? 0) }))
+      : undefined;
   const send = postJson<QuoteResponse>(
     endpoint(p, "quote"),
     {

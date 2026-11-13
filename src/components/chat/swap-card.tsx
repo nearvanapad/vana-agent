@@ -146,6 +146,8 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
   const key = ["swap", proposal.id];
   // Paid on another chain: approving gives a deposit address instead of a wallet prompt.
   const byDeposit = proposal.pay === "deposit";
+  // The user's wallet registers them on the token received, unless the setup is sponsored.
+  const ownRegistration = Boolean(proposal.register) && !proposal.sponsored;
   const [ack, setAck] = useState(false);
   const { risk, checking } = useSwapRisk(proposal);
 
@@ -205,7 +207,7 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
   let action: ReactNode;
   if (!mine) {
     action = <Note>This swap was prepared for {shortAccount(owner)}. Sign in with that wallet to approve it.</Note>;
-  } else if ((!byDeposit || proposal.register) && wallet.account !== owner) {
+  } else if ((!byDeposit || ownRegistration) && wallet.account !== owner) {
     action = (
       <Note>
         Connect <span className="font-mono">{shortAccount(owner)}</span> in your wallet to approve.
@@ -229,11 +231,11 @@ export function SwapCard({ proposal }: { proposal: Proposal }) {
           className={clsx(STICKER, "w-full gap-2 rounded-well px-4 py-[11px]")}
         >
           {approve.isPending ? <Loader2 size={16} className="animate-spin" /> : byDeposit ? <Send size={16} /> : <Wallet size={16} />}
-          {approve.isPending ? "Getting the final quote…" : byDeposit ? (proposal.register ? "Register, then get the deposit address" : "Approve and get the deposit address") : "Approve in wallet"}
+          {approve.isPending ? "Getting the final quote…" : byDeposit ? (ownRegistration ? "Register, then get the deposit address" : "Approve and get the deposit address") : "Approve in wallet"}
         </button>
         <p className="text-center text-xs text-text-2">
           {byDeposit
-            ? `${proposal.register ? `Your wallet first registers you on ${proposal.to.symbol} (about 0.00125 NEAR), so it can be delivered. ` : ""}Next you send ${proposal.from.amount} ${proposal.from.symbol} on ${chainName(proposal.from.chain)} yourself. Nothing is sent before that.`
+            ? `${ownRegistration ? `Your wallet first registers you on ${proposal.to.symbol} (about 0.00125 NEAR), so it can be delivered. ` : proposal.register ? `We register you on ${proposal.to.symbol} first, so it can be delivered; no NEAR needed. ` : ""}Next you send ${proposal.from.amount} ${proposal.from.symbol} on ${chainName(proposal.from.chain)} yourself. Nothing is sent before that.`
             : "Your wallet shows the exact transaction before anything is sent."}
           {countdown && (
             <>

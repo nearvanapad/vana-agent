@@ -80,6 +80,15 @@ const MIGRATIONS = [
      n INTEGER NOT NULL,
      PRIMARY KEY (key, day)
    );`,
+  // Account registrations the app paid for (see swap/sponsor.ts), counted when sent: the daily limits read it.
+  `CREATE TABLE sponsor_spend (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     at_ms INTEGER NOT NULL,
+     account TEXT NOT NULL,
+     token TEXT NOT NULL,
+     yocto TEXT NOT NULL
+   );
+   CREATE INDEX sponsor_spend_at ON sponsor_spend (at_ms);`,
 ];
 
 let db: Database.Database | null = null;

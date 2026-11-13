@@ -14,6 +14,7 @@ import { fromRaw, resolveAsset, SwapError, toRaw, wnear, type Asset } from "./as
 import { addressError, chainName, dryAddress } from "./chains";
 import { bestRoute, quotePath, swapMsg } from "./rhea-route";
 import { swapRisk, type SwapRisk } from "./risk";
+import { canSponsor, config as sponsorConfig, setupFeeBps, sentFeeBps, sponsorRegistration, totalFeeBps, withinTotal } from "./sponsor";
 
 /**
  * Swaps the agent can price and propose, and the user approves. The flow:
@@ -71,6 +72,15 @@ export type Proposal = SwapQuote & {
    * register it first, or the token couldn't be delivered.
    */
   register?: boolean;
+  /**
+   * The registration is paid for by us, not the user's wallet, and the quote's fee carries it: the
+   * server registers the account before the deposit address is shown, so no NEAR is needed.
+   */
+  sponsored?: boolean;
+  /** What the setup adds to what the user pays, in bps of the amount sent. Only when sponsored. */
+  setup_fee_bps?: number;
+  /** What is added to the fee we send 1Click to get that after its split. Only when sponsored. */
+  setup_sent_bps?: number;
   id: string;
   account: string;
   /** The last token check of the token bought, when there is one and the account may see checks. A swap never runs one. */
@@ -178,6 +188,8 @@ type Resolved = {
   /** The refund address on the paying chain, for a deposit swap. */
   refundTo: string | null;
   pay: "wallet" | "deposit";
+  /** The sponsored account setup this swap's quote carries, when it does. */
+  setup?: { charged: number; sent: number };
 };
 
 /** A checked address on `chain`, or null when none was given. */
@@ -243,7 +255,31 @@ async function intentsQuote(r: Resolved, account: string | null, dry: boolean) {
     recipient: r.recipient ?? (r.to.chain === "near" ? (account ?? DRY_ACCOUNT) : standIn(r.to.chain)),
     refundTo: r.pay === "wallet" ? (account ?? DRY_ACCOUNT) : (r.refundTo ?? standIn(r.from.chain)),
     deadline: new Date(Date.now() + (dry ? 10 : depositMinutes(r)) * 60_000),
+    extraFeeBps: r.setup?.sent,
   });
+}
+
+/**
+ * Whether we set up the account on the token a deposit swap pays out in, and what that adds to the
+ * fee. Only when the account isn't registered, a sponsor account is set, our own fee is on to
+ * collect it through, and the swap is big enough that the setup fits under the cap. Anything else
+ * leaves it to the user's wallet, as before.
+ */
+async function setupPlan(r: Resolved, account: string | null): Promise<Resolved["setup"] | undefined> {
+  const fee = intents.ourFee();
+  if (!account || !fee || !sponsorConfig() || r.pay !== "deposit" || r.to.chain !== "near" || !r.to.token) return undefined;
+  const reg = await registration(r.to.token, account);
+  if (!reg) return undefined;
+  const deposit = BigInt(reg.params.deposit);
+  const amountUsd = r.from.price_usd === null ? null : Number(fromRaw(r.raw, r.from.decimals)) * r.from.price_usd;
+  const nearUsd = (await resolveAsset("NEAR").catch(() => null))?.price_usd ?? null;
+  const cap = sponsorConfig()!.maxFeeBps;
+  const own = setupFeeBps({ deposit, nearUsd, amountUsd, maxBps: cap });
+  if (own === null) return undefined;
+  const sent = sentFeeBps(fee.fee, own, fee.keyed) - fee.fee;
+  if (!withinTotal(fee.fee + sent, fee.keyed)) return undefined;
+  if (!(await canSponsor(r.to.token, account, deposit))) return undefined;
+  return { charged: totalFeeBps(fee.fee + sent, fee.keyed) - totalFeeBps(fee.fee, fee.keyed), sent };
 }
 
 function intentsError(e: unknown): SwapError {
@@ -264,7 +300,9 @@ export function quoteSwap(input: SwapInput, account: string | null, network: Net
 }
 
 async function quoteSwapOn(input: SwapInput, account: string | null): Promise<SwapQuote> {
-  return priced(await resolve(input, account, false), account);
+  const r = await resolve(input, account, false);
+  r.setup = await setupPlan(r, account);
+  return priced(r, account);
 }
 
 async function priced(r: Resolved, account: string | null): Promise<SwapQuote> {
@@ -290,6 +328,9 @@ async function priced(r: Resolved, account: string | null): Promise<SwapQuote> {
         refund_to: r.refundTo,
         fees: [
           ...(fee ? [`${intents.PROVIDER_LABEL[q.provider]} fee ${fee / 100}%, included in the quote.`] : []),
+          ...(r.setup
+            ? [`Includes ${r.setup.charged / 100}% for setting up your account on ${to.symbol}, once. Otherwise your wallet pays that in NEAR first.`]
+            : []),
           r.pay === "wallet"
             ? "Plus NEAR gas and, if needed, token registration (under 0.01 NEAR)."
             : `Plus the ${chainName(from.chain)} network fee for your transfer.`,
@@ -363,6 +404,7 @@ export function proposeSwap(input: SwapInput, account: string, conversationId: s
 
 async function proposeSwapOn(input: SwapInput, account: string, conversationId: string | null, network: Network): Promise<Proposal> {
   const r = await resolve(input, account, true);
+  r.setup = await setupPlan(r, account);
   // A deposit swap is paid on another chain, whose balance we can't read.
   if (r.pay === "wallet") {
     const have = await spendable(r.from, account);
@@ -408,6 +450,7 @@ async function proposeSwapOn(input: SwapInput, account: string, conversationId: 
     risk,
     checkable,
     register,
+    ...(r.setup ? { sponsored: true, setup_fee_bps: r.setup.charged, setup_sent_bps: r.setup.sent } : {}),
     warnings,
     expires_at: new Date(now + PROPOSAL_TTL_MS).toISOString(),
   };
@@ -517,6 +560,19 @@ async function registration(token: string, account: string): Promise<FunctionCal
   return bounds ? storageDeposit(account, bounds.min) : null;
 }
 
+/** Registers `account` on `token` from the sponsor account and waits until it shows. */
+async function setUpAccount(token: string, account: string, deposit: bigint): Promise<void> {
+  if (!(await canSponsor(token, account, deposit))) {
+    throw new SwapError("Account setup isn't available right now. Ask for a new quote.");
+  }
+  await sponsorRegistration(token, account, deposit);
+  for (let i = 0; i < 10; i++) {
+    if ((await registration(token, account)) === null) return;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  throw new SwapError("Your account setup is still confirming. Ask for a new quote in a minute.");
+}
+
 /**
  * The deposit (NEAR Intents) or the pool swap (Rhea) as wallet transactions. Registrations come
  * first; the payment is the last action of the last transaction, so its outcome is the swap's.
@@ -564,6 +620,10 @@ async function approveSwapOn(id: string, account: string): Promise<{ swap: SwapV
     throw new SwapError("This quote expired. Ask for a new one.");
   }
   const r = await resolve(input, account, true);
+  // The real quote carries the same setup fee the card showed.
+  if (proposal.sponsored && proposal.setup_sent_bps !== undefined) {
+    r.setup = { charged: proposal.setup_fee_bps ?? 0, sent: proposal.setup_sent_bps };
+  }
   const floor = BigInt(proposal.min_out_raw);
   let txs: WalletTx[];
 
@@ -581,7 +641,12 @@ async function approveSwapOn(id: string, account: string): Promise<{ swap: SwapV
     if (r.pay === "deposit") {
       // The user sends the deposit on the other chain. The only thing to sign is registering the
       // account on the token it receives, when it isn't yet: 1Click can't deliver to an unregistered one.
-      const reg = r.to.chain === "near" && r.to.token ? await registration(r.to.token, account) : null;
+      let reg = r.to.chain === "near" && r.to.token ? await registration(r.to.token, account) : null;
+      // A sponsored swap has it done here, before the deposit address is out, so the delivery can't come first.
+      if (reg && proposal.sponsored) {
+        await setUpAccount(r.to.token!, account, BigInt(reg.params.deposit));
+        reg = null;
+      }
       txs = reg ? [{ receiverId: r.to.token!, actions: [reg] }] : [];
       update(id, {
         status: reg ? "signing" : "awaiting_deposit",

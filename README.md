@@ -80,6 +80,8 @@ Swaps reach NEAR Intents through one upstream, set by `INTENTS_PROVIDER`:
 
 Our fee is set server-side only. For 1Click it is `INTENTS_FEE_BPS` and `INTENTS_FEE_RECIPIENT`; for Aurora it is set per key in Aurora's portal. See `.env.example`.
 
+Account setup for swaps paid from another chain is optional and off by default. A NEAR token needs the receiving account registered (`storage_deposit`, about 0.00125 NEAR) before 1Click can deliver to it, and a user with no NEAR can't pay for that. Set `SPONSOR_ACCOUNT_ID` and `SPONSOR_PRIVATE_KEY` and, for an unregistered account, the server registers it before the deposit address is shown and the quote adds a few bps to our fee to cover it (the card says so). It needs our 1Click fee set, and falls back to the user's wallet registering when the swap is too small for the fee, a limit is reached, or the sponsor account runs low. Limits, and why the key can only do this, are in `.env.example` and `src/lib/swap/sponsor.ts`.
+
 ## Deploy
 
 Live at https://vana.nearvana.trade. `deploy/ship.sh` builds HEAD for linux/amd64, pushes it to `ghcr.io/nearvanapad/vana-agent` and runs it on the server, rolling back if it doesn't come up healthy. `TAG=<sha> deploy/ship.sh` redeploys an older image. Secrets live in the server's `.env` (see `deploy/env.example`); public build values in `deploy/build.env`.
