@@ -3,7 +3,7 @@ import { getDb } from "../db";
 import { YOCTO } from "../near/config";
 import { DEFAULT_WALLET, networkById, type Network } from "../near/network";
 import { onNetwork } from "../near/network-server";
-import { tryView, txStatus, viewAccount } from "../near/rpc";
+import { RpcError, tryView, txStatus, viewAccount } from "../near/rpc";
 import { ftTransfer, ftTransferCall, nearDeposit, nearWithdraw, storageDeposit, type FunctionCallAction, type WalletTx } from "../near/tx";
 import { access } from "../gate/access";
 import { storedReport } from "../risk/report";
@@ -14,6 +14,7 @@ import { fromRaw, resolveAsset, SwapError, toRaw, wnear, type Asset } from "./as
 import { addressError, chainName, dryAddress } from "./chains";
 import { bestRoute, quotePath, swapMsg } from "./rhea-route";
 import { swapRisk, type SwapRisk } from "./risk";
+import { freeNear, shortfallMessage } from "./setup";
 
 /**
  * Swaps the agent can price and propose, and the user approves. The flow:
@@ -396,8 +397,9 @@ async function proposeSwapOn(input: SwapInput, account: string, conversationId: 
     );
   }
 
-  // A wallet swap registers the receiver in its own transactions; a deposit swap has none, so approval adds one.
-  const register = r.pay === "deposit" && r.to.chain === "near" && Boolean(r.to.token) && (await registration(r.to.token!, account)) !== null;
+  // A wallet swap registers the receiver in its own transactions; a deposit swap has none, so approval
+  // adds one, paid by the user's wallet. An account that can't pay it is refused here, before any card.
+  const register = r.pay === "deposit" && r.to.chain === "near" && Boolean(r.to.token) && (await depositRegistration(r, account)) !== null;
 
   const id = `swp_${randomBytes(9).toString("base64url")}`;
   const now = Date.now();
@@ -517,6 +519,29 @@ async function registration(token: string, account: string): Promise<FunctionCal
   return bounds ? storageDeposit(account, bounds.min) : null;
 }
 
+/** Spendable NEAR of `account`; null when it doesn't exist on chain. */
+async function accountNear(account: string): Promise<bigint | null> {
+  try {
+    return freeNear(await viewAccount(account));
+  } catch (e) {
+    if (e instanceof RpcError && e.kind === "UNKNOWN_ACCOUNT") return null;
+    throw e;
+  }
+}
+
+/**
+ * The registration a deposit swap needs on the token it delivers, or null when none. Throws when
+ * the account can't pay it: no server key ever pays it, and the deposit address must not go out
+ * before the account can receive.
+ */
+async function depositRegistration(r: Resolved, account: string): Promise<FunctionCallAction | null> {
+  const reg = await registration(r.to.token!, account);
+  if (!reg) return null;
+  const msg = shortfallMessage(await accountNear(account), BigInt(reg.params.deposit), account, r.to.symbol);
+  if (msg) throw new SwapError(msg);
+  return reg;
+}
+
 /**
  * The deposit (NEAR Intents) or the pool swap (Rhea) as wallet transactions. Registrations come
  * first; the payment is the last action of the last transaction, so its outcome is the swap's.
@@ -581,7 +606,8 @@ async function approveSwapOn(id: string, account: string): Promise<{ swap: SwapV
     if (r.pay === "deposit") {
       // The user sends the deposit on the other chain. The only thing to sign is registering the
       // account on the token it receives, when it isn't yet: 1Click can't deliver to an unregistered one.
-      const reg = r.to.chain === "near" && r.to.token ? await registration(r.to.token, account) : null;
+      // Checked again here: the account's NEAR may have moved since the proposal.
+      const reg = r.to.chain === "near" && r.to.token ? await depositRegistration(r, account) : null;
       txs = reg ? [{ receiverId: r.to.token!, actions: [reg] }] : [];
       update(id, {
         status: reg ? "signing" : "awaiting_deposit",
