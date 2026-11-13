@@ -51,7 +51,7 @@ export function NetworkSwitch() {
           align="start"
           sideOffset={6}
           collisionPadding={8}
-          className="z-[70] flex w-[300px] max-w-[calc(100vw-16px)] flex-col gap-1 rounded-card border border-line bg-bg p-1.5 shadow-2xl shadow-void/60"
+          className="m-pop z-[70] flex w-[300px] max-w-[calc(100vw-16px)] flex-col gap-1 rounded-card border border-line bg-bg p-1.5 shadow-2xl shadow-void/60"
         >
           <div className={clsx(EYEBROW, "px-2.5 pt-1.5 pb-1 text-text-2")}>Wallet and swaps on</div>
           {OPTIONS.map((o) => {

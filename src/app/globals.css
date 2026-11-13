@@ -331,11 +331,103 @@ body {
   animation: n-pop 0.4s cubic-bezier(0.2, 0.8, 0.25, 1);
 }
 
+/*
+ * Things that open: dialogs, popovers, drawers, the side pane. Opacity and transform only, so the
+ * compositor runs them without layout or paint. Radix marks its parts data-state="open|closed"
+ * and keeps a closing part mounted until its animation ends, so one class animates both ways.
+ * The m-rise and m-float classes run on mount only.
+ */
+@keyframes m-fade-out {
+  to { opacity: 0; }
+}
+@keyframes m-pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+}
+@keyframes m-pop-out {
+  to { opacity: 0; transform: scale(0.97); }
+}
+@keyframes m-rise {
+  from { opacity: 0; transform: translateY(6px); }
+}
+@keyframes m-from-right {
+  from { transform: translateX(100%); }
+}
+@keyframes m-to-right {
+  to { transform: translateX(100%); }
+}
+@keyframes m-from-left {
+  from { transform: translateX(-100%); }
+}
+@keyframes m-to-left {
+  to { transform: translateX(-100%); }
+}
+.n-fade[data-state="closed"],
+.m-scrim[data-state="closed"] {
+  animation: m-fade-out 0.18s ease-in forwards;
+}
+.n-pop[data-state="closed"] {
+  animation: m-pop-out 0.15s ease-in forwards;
+}
+.m-scrim[data-state="open"] {
+  animation: n-fade 0.22s ease-out;
+}
+.m-pop {
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+.m-pop[data-state="open"] {
+  animation: m-pop-in 0.16s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+.m-pop[data-state="closed"] {
+  animation: m-pop-out 0.12s ease-in forwards;
+}
+.m-drawer-right[data-state="open"] {
+  animation: m-from-right 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.m-drawer-right[data-state="closed"] {
+  animation: m-to-right 0.2s ease-in forwards;
+}
+.m-drawer-left[data-state="open"] {
+  animation: m-from-left 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.m-drawer-left[data-state="closed"] {
+  animation: m-to-left 0.2s ease-in forwards;
+}
+.m-rise {
+  animation: m-rise 0.24s ease-out;
+}
+.m-float {
+  transform-origin: top right;
+  animation: m-pop-in 0.18s cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+
+/* Moving between pages (React <ViewTransition>, see the page files): the old page fades, the new one rises in. */
+::view-transition {
+  pointer-events: none;
+}
+::view-transition-old(.page) {
+  animation: m-fade-out 0.14s ease-in both;
+}
+::view-transition-new(.page) {
+  animation: m-rise 0.26s ease-out 0.06s both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .vana *,
   .n-fade,
-  .n-pop {
+  .n-pop,
+  .m-scrim,
+  .m-pop,
+  .m-drawer-right,
+  .m-drawer-left,
+  .m-rise,
+  .m-float {
     animation: none !important;
+  }
+  ::view-transition-old(*),
+  ::view-transition-new(*),
+  ::view-transition-group(*) {
+    animation-duration: 0s !important;
+    animation-delay: 0s !important;
   }
 }
 

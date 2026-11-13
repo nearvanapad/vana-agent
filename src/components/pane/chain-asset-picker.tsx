@@ -103,7 +103,7 @@ export function ChainAssetPicker({
           sideOffset={6}
           collisionPadding={{ top: 8, left: 8, right: 8, bottom: innerWidth < 768 ? 64 : 8 }}
           aria-label={label}
-          className="z-[70] flex max-h-[min(560px,var(--radix-popover-content-available-height))] w-[max(var(--radix-popover-trigger-width),320px)] max-w-[calc(100vw-16px)] flex-col rounded-card border border-line bg-bg shadow-2xl shadow-void/60"
+          className="m-pop z-[70] flex max-h-[min(560px,var(--radix-popover-content-available-height))] w-[max(var(--radix-popover-trigger-width),320px)] max-w-[calc(100vw-16px)] flex-col rounded-card border border-line bg-bg shadow-2xl shadow-void/60"
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             (e.currentTarget as HTMLElement).querySelector("input")?.focus();

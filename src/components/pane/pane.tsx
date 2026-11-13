@@ -67,7 +67,10 @@ function Body({ mode, grab, title }: { mode: Mode; grab?: (e: React.PointerEvent
           </button>
         </div>
       </header>
-      {pane.tab === "check" ? <CheckTab /> : <SwapTab />}
+      {/* Keyed, so switching tools fades the new one in. */}
+      <div key={pane.tab} className="m-rise flex min-h-0 flex-1 flex-col">
+        {pane.tab === "check" ? <CheckTab /> : <SwapTab />}
+      </div>
     </div>
   );
 }
@@ -76,7 +79,7 @@ function Body({ mode, grab, title }: { mode: Mode; grab?: (e: React.PointerEvent
 export function PaneDocked() {
   if (usePaneMode() !== "inline") return null;
   return (
-    <aside className="flex h-dvh w-[440px] shrink-0 flex-col overflow-hidden border-l border-line bg-surface/30" aria-label="Side pane">
+    <aside className="n-fade flex h-dvh w-[440px] shrink-0 flex-col overflow-hidden border-l border-line bg-surface/30" aria-label="Side pane">
       <Body mode="inline" />
     </aside>
   );
@@ -189,7 +192,7 @@ function Floating() {
       ref={ref}
       role="dialog"
       aria-label="Token checks and swaps"
-      className="fixed z-30 resize overflow-hidden rounded-card border border-line bg-bg shadow-2xl shadow-void/60"
+      className="m-float fixed z-30 resize overflow-hidden rounded-card border border-line bg-bg shadow-2xl shadow-void/60"
       style={{ left: box.x, top: box.y, width: box.w, height: box.h, minWidth: MIN_W, minHeight: MIN_H }}
     >
       <Body mode="float" grab={grab} />
@@ -208,7 +211,7 @@ export function PaneOverlay() {
     <Dialog.Root modal={false} open={mode === "drawer"} onOpenChange={(o) => pane.dispatch(o ? { t: "open" } : { t: "close" })}>
       <Dialog.Portal>
         {/* Between the header and the tab bar, so both stay in view. */}
-        <div className={clsx("fixed inset-x-0 top-15 z-40 bg-scrim", BOTTOM)} aria-hidden />
+        <div data-state={mode === "drawer" ? "open" : "closed"} className={clsx("m-scrim fixed inset-x-0 top-15 z-40 bg-scrim", BOTTOM)} aria-hidden />
         <Dialog.Content
           // Focus stays where the user pressed; Tab moves into the drawer.
           onOpenAutoFocus={(e) => e.preventDefault()}
@@ -216,7 +219,7 @@ export function PaneOverlay() {
             // The tab bar switches the drawer's tab itself.
             if ((e.detail.originalEvent.target as Element | null)?.closest("[data-tab-bar]")) e.preventDefault();
           }}
-          className={clsx("fixed right-0 top-15 z-50 w-full overflow-hidden border-l border-line bg-bg shadow-[-12px_0_32px_rgb(0_0_0/0.35)] sm:w-[440px]", BOTTOM)}
+          className={clsx("m-drawer-right fixed right-0 top-15 z-50 w-full overflow-hidden border-l border-line bg-bg shadow-[-12px_0_32px_rgb(0_0_0/0.35)] sm:w-[440px]", BOTTOM)}
         >
           <Dialog.Description className="sr-only">Token checks and swaps</Dialog.Description>
           <Body mode="drawer" title={(text) => <Dialog.Title className="truncate font-display text-base tracking-[0.02em]">{text}</Dialog.Title>} />

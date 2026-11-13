@@ -65,7 +65,7 @@ export function VerifyBadge({ conversationId, messageId, latest }: { conversatio
           align="start"
           sideOffset={6}
           collisionPadding={8}
-          className="z-[70] w-[300px] max-w-[calc(100vw-16px)] rounded-card border border-line bg-bg p-3 text-[13px] shadow-2xl shadow-void/60"
+          className="m-pop z-[70] w-[300px] max-w-[calc(100vw-16px)] rounded-card border border-line bg-bg p-3 text-[13px] shadow-2xl shadow-void/60"
         >
           <p className="m-0 text-pretty">{l.proves}</p>
           {v.status === "verified" && (

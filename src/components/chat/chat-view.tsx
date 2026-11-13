@@ -101,7 +101,7 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
   const locked = useUnlocked() === false;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="m-rise flex min-h-0 flex-1 flex-col">
       <div ref={scroller} onScroll={onScroll} className="min-h-0 flex-1 overflow-y-auto px-[clamp(12px,3vw,24px)]">
         <div className="mx-auto flex max-w-[720px] flex-col gap-[clamp(16px,3vw,22px)] pt-[clamp(16px,4vw,28px)] pb-6">
           {locked ? (

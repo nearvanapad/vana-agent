@@ -164,8 +164,8 @@ export function ChatApp() {
 
         <Dialog.Root open={menu} onOpenChange={setMenu}>
           <Dialog.Portal>
-            <Dialog.Overlay className="fixed inset-0 z-40 bg-scrim md:hidden" />
-            <Dialog.Content className="fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] flex-col border-r border-line bg-bg shadow-[12px_0_32px_rgb(0_0_0/0.35)] md:hidden">
+            <Dialog.Overlay className="m-scrim fixed inset-0 z-40 bg-scrim md:hidden" />
+            <Dialog.Content className="m-drawer-left fixed inset-y-0 left-0 z-50 flex w-72 max-w-[85%] flex-col border-r border-line bg-bg shadow-[12px_0_32px_rgb(0_0_0/0.35)] md:hidden">
               <div className="flex h-15 shrink-0 items-center gap-2.5 pr-3 pl-4">
                 <Dialog.Title className="flex flex-1 font-display text-[22px] tracking-[0.04em] text-accent-deep">
                   <Link href="/" title="VANA home" className="flex items-center gap-2.5 rounded-[10px]">
