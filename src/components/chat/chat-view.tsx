@@ -14,6 +14,7 @@ import { Mascot, type Mood } from "@/components/vana/mascot";
 import { Composer } from "./composer";
 import { useTier } from "./use-tier";
 import { Message } from "./message";
+import { WARN_AT, type Budget } from "@/lib/chat/limits";
 
 /** Server errors arrive as the response body: show its `error` text when it is JSON. */
 function errorText(e: Error): string {
@@ -26,6 +27,23 @@ function errorText(e: Error): string {
   return e.message || "Something went wrong.";
 }
 
+/** What the server's `x-chat-left` header says is left today: "<n> <budget>". */
+type Left = { n: number; budget: Budget };
+function parseLeft(h: string | null): Left | null {
+  const [n, budget] = (h ?? "").split(" ");
+  const k = Number(n);
+  return Number.isInteger(k) && k >= 0 && budget && budget in WARN_AT ? { n: k, budget: budget as Budget } : null;
+}
+
+/** The hint once few messages remain, else null. */
+function leftText(l: Left | null, tier: string | undefined): string | null {
+  if (!l || l.n > WARN_AT[l.budget]) return null;
+  // A Partner count says nothing about the other tiers.
+  if (l.budget.startsWith("partner") && tier !== "partner") return null;
+  const msgs = `${l.n} ${l.budget.startsWith("partner") ? "Partner " : ""}message${l.n === 1 ? "" : "s"} left today`;
+  return l.budget.endsWith("network") ? `${msgs} on this network (shared by everyone on it). Resets at 00:00 UTC.` : `${msgs}. Resets at 00:00 UTC.`;
+}
+
 /** A deliberately risky testnet token, deployed by `pnpm demo-token`, to show what a red report looks like. */
 const DEMO_TOKEN = process.env.NEXT_PUBLIC_DEMO_TOKEN || "rug.vanarug4hgzsi.testnet";
 
@@ -34,10 +52,17 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
   const qc = useQueryClient();
   const [think, setThink] = useState(false);
   const { tiers, tier, setTier } = useTier();
+  const [left, setLeft] = useState<Left | null>(null);
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/chat",
+        // Reads the "left today" count off the reply; the body is passed on untouched.
+        fetch: async (input, init) => {
+          const res = await fetch(input, init);
+          if (res.ok) setLeft(parseLeft(res.headers.get("x-chat-left")));
+          return res;
+        },
         // The server keeps the thread: send only the new message.
         prepareSendMessagesRequest: ({ id, messages, body }) => ({ body: { ...body, id, message: messages[messages.length - 1] } }),
       }),
@@ -142,6 +167,11 @@ export function ChatView(props: { id: string; initial: UIMessage[]; account: str
               void stop();
             }}
           />
+          {!error && leftText(left, tier) && (
+            <p className="mt-1.5 text-center text-xs text-text-2" role="status">
+              {leftText(left, tier)}
+            </p>
+          )}
         </div>
       </div>
     </div>

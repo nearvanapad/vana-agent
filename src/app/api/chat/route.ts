@@ -18,7 +18,7 @@ import { buildTools } from "@/lib/agent/tools";
 import { ownerOf, readSession } from "@/lib/auth/session";
 import { CONVERSATION_ID, ensureConversation, loadMessages, NotYours, saveMessages, titleFrom } from "@/lib/chat/store";
 import { allow, allowToday, ipOf } from "@/lib/chat/rate-limit";
-import { CHAT_PER_DAY, PARTNER_PER_DAY } from "@/lib/chat/limits";
+import { CHAT_PER_DAY, IP_CHAT_PER_DAY, IP_PARTNER_PER_DAY, PARTNER_PER_DAY, type Budget } from "@/lib/chat/limits";
 import { access, denied } from "@/lib/gate/access";
 import { crossSite } from "@/lib/http/same-site";
 
@@ -72,23 +72,18 @@ export async function POST(req: Request) {
   if (JSON.stringify(message.parts).length > MAX_INPUT * 2 || text.length === 0) {
     return Response.json({ error: "Message is empty or too long." }, { status: 400 });
   }
-  // Chat is free for any signed-in wallet for now, so each IP and each wallet gets a daily budget,
+  // Chat is free for any signed-in wallet for now, so each wallet and each IP gets a daily budget,
   // and a smaller one for the Partner tier, whose model costs far more.
-  const who = [`ip:${ipOf(req)}`, ...(s.account ? [`acct:${s.account}`] : [])];
+  const ip = `ip:${ipOf(req)}`;
   const partner = TIERS !== null && (body.data.tier ?? DEFAULT_TIER) === "partner";
-  const full = allowToday([
-    ...who.map((key) => ({ key, cap: CHAT_PER_DAY })),
-    ...(partner ? who.map((key) => ({ key: `partner:${key}`, cap: PARTNER_PER_DAY })) : []),
+  const { full, left } = allowToday([
+    ...(s.account ? [{ key: `acct:${s.account}`, cap: CHAT_PER_DAY }] : []),
+    { key: ip, cap: IP_CHAT_PER_DAY },
+    ...(partner
+      ? [...(s.account ? [{ key: `partner:acct:${s.account}`, cap: PARTNER_PER_DAY }] : []), { key: `partner:${ip}`, cap: IP_PARTNER_PER_DAY }]
+      : []),
   ]);
-  if (full?.startsWith("partner:")) {
-    return Response.json(
-      { error: `You've used today's ${PARTNER_PER_DAY} Partner messages. Switch to Private or Incognito to keep going; Partner resets at 00:00 UTC.` },
-      { status: 429 },
-    );
-  }
-  if (full) {
-    return Response.json({ error: `You've reached today's limit of ${CHAT_PER_DAY} messages. It resets at 00:00 UTC.` }, { status: 429 });
-  }
+  if (full) return Response.json({ error: LIMIT_REACHED[budgetOf(full)] }, { status: 429 });
   const { id, think, pane, tier } = body.data;
 
   try {
@@ -143,6 +138,8 @@ export async function POST(req: Request) {
   });
 
   return createUIMessageStreamResponse({
+    // What is left of the tightest budget, for the chat's "left today" hint.
+    headers: left ? { "x-chat-left": `${left.n} ${budgetOf(left.key)}` } : undefined,
     stream: toUIMessageStream({
       stream: result.stream,
       originalMessages: messages,
@@ -163,6 +160,18 @@ export async function POST(req: Request) {
     }),
   });
 }
+
+/** The budget a usage key counts. */
+const budgetOf = (key: string): Budget =>
+  key.startsWith("partner:") ? (key.startsWith("partner:ip:") ? "partner-network" : "partner") : key.startsWith("ip:") ? "network" : "wallet";
+
+const SWITCH = "Switch to Private or Incognito to keep going; Partner resets at 00:00 UTC.";
+const LIMIT_REACHED: Record<Budget, string> = {
+  wallet: `You've reached today's limit of ${CHAT_PER_DAY} messages. It resets at 00:00 UTC.`,
+  network: `This network has used today's ${IP_CHAT_PER_DAY} messages (shared by everyone on it, such as the same wifi). It resets at 00:00 UTC.`,
+  partner: `You've used today's ${PARTNER_PER_DAY} Partner messages. ${SWITCH}`,
+  "partner-network": `This network has used today's ${IP_PARTNER_PER_DAY} Partner messages (shared by everyone on it). ${SWITCH}`,
+};
 
 /** One "chat usage" log line per reply: tokens summed over its steps. No account, IP or text. */
 function logUsage(llm: { tier?: string; id: string }, think: boolean, steps: number, finish: string, usage: LanguageModelUsage[]) {

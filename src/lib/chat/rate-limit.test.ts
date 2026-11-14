@@ -15,17 +15,17 @@ describe("allowToday", () => {
       { key: "ip:a", cap: 3 },
       { key: "partner:ip:a", cap: 2 },
     ];
-    assert.equal(allowToday(limits), null);
-    assert.equal(allowToday(limits), null);
-    assert.equal(allowToday(limits), "partner:ip:a");
+    assert.deepEqual(allowToday(limits), { full: null, left: { key: "partner:ip:a", n: 1 } });
+    assert.deepEqual(allowToday(limits), { full: null, left: { key: "partner:ip:a", n: 0 } });
+    assert.deepEqual(allowToday(limits), { full: "partner:ip:a", left: null });
     // The refused message wasn't counted: the shared key still has room.
-    assert.equal(allowToday([{ key: "ip:a", cap: 3 }]), null);
-    assert.equal(allowToday([{ key: "ip:a", cap: 3 }]), "ip:a");
+    assert.deepEqual(allowToday([{ key: "ip:a", cap: 3 }]), { full: null, left: { key: "ip:a", n: 0 } });
+    assert.equal(allowToday([{ key: "ip:a", cap: 3 }]).full, "ip:a");
   });
 
-  it("keeps keys apart", () => {
-    assert.equal(allowToday([{ key: "ip:b", cap: 1 }]), null);
-    assert.equal(allowToday([{ key: "ip:b", cap: 1 }]), "ip:b");
-    assert.equal(allowToday([{ key: "acct:b.near", cap: 1 }]), null);
+  it("keeps keys apart and reports the tightest", () => {
+    assert.equal(allowToday([{ key: "ip:b", cap: 1 }]).full, null);
+    assert.equal(allowToday([{ key: "ip:b", cap: 1 }]).full, "ip:b");
+    assert.deepEqual(allowToday([{ key: "acct:b.near", cap: 5 }, { key: "ip:c", cap: 2 }]).left, { key: "ip:c", n: 1 });
   });
 });

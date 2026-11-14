@@ -12,7 +12,7 @@ Built at NEAR HACKATHON. Tracks:
 
 Live at https://vana.nearvana.trade, on mainnet by default (the header badge switches to testnet). Each step says what to do and what you should see.
 
-1. **Open `/app`, pick testnet with the header badge, connect a testnet wallet and sign in.** You get a signature prompt, not a transaction. Any signed-in wallet can chat, up to 200 messages a day (20 of them on the Partner tier).
+1. **Open `/app`, pick testnet with the header badge, connect a testnet wallet and sign in.** You get a signature prompt, not a transaction. Any signed-in wallet can chat, up to 100 messages a day per wallet (10 of them on the Partner tier) and 300 per IP, so a shared network isn't locked out; the chat says how many are left once few remain.
 2. **Ask "is rug.vanarug4hgzsi.testnet safe?"** You get a red report: the dev's full-access key on the token, the dev keeps the pool's LP, and early buyers tie back to the dev. Every number cites its source.
 3. **Look under the reply.** On the Private tier the badge reads "Verified · private". Tap it to see the signer, the Intel TDX status and the GPU check.
 4. **Ask "swap 1 NEAR to nvana.nearvana2.nearvanapad.testnet".** VANA quotes it and runs the token check first, then asks you to decide. Reply "yes, swap it": an approval card with the quote appears in the pane, and your wallet asks you to sign. The AI never signs. The card can't appear in the same reply that read token names or symbols (the prompt-injection guard below), so a swap always takes your second message. The pane's Swap tab skips the chat and quotes straight away.
