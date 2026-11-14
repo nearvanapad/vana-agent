@@ -2,6 +2,7 @@
 
 import type { NearConnector, NearWalletBase } from "@hot-labs/near-connect";
 import { NETWORK, RPC_URL } from "./config";
+import { networkOf } from "./network";
 import { oneActionEach, outcomesPerTx, PartlySent, REFUSED, stoppedAt, type WalletTx } from "./tx";
 
 export { PartlySent };
@@ -29,11 +30,21 @@ export function getConnector(): Promise<NearConnector> {
   ));
 }
 
+/**
+ * The wallet account still connected from an earlier visit, if it belongs to this network. A
+ * named account from the other one (connected back when testnet was the default) is
+ * disconnected, as the network badge does on a switch. Implicit and `0x` accounts exist on both.
+ */
 export async function restoreAccount(): Promise<string | null> {
   const c = await getConnector();
   try {
     const { accounts } = await c.getConnectedWallet();
-    return accounts[0]?.accountId ?? null;
+    const id = accounts[0]?.accountId ?? null;
+    if (id && id.includes(".") && networkOf(id).id !== NETWORK) {
+      await c.disconnect().catch(() => {});
+      return null;
+    }
+    return id;
   } catch {
     return null;
   }

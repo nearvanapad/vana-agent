@@ -6,6 +6,7 @@ import {
   streamText,
   toUIMessageStream,
   validateUIMessages,
+  type LanguageModelUsage,
   type UIMessage,
 } from "ai";
 import { z } from "zod";
@@ -65,6 +66,12 @@ export async function POST(req: Request) {
 
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) return Response.json({ error: "Bad request." }, { status: 400 });
+  // Checked before the daily count, so a refused message costs nothing.
+  const message = body.data.message as unknown as UIMessage;
+  const text = titleFrom(message);
+  if (JSON.stringify(message.parts).length > MAX_INPUT * 2 || text.length === 0) {
+    return Response.json({ error: "Message is empty or too long." }, { status: 400 });
+  }
   // Chat is free for any signed-in wallet for now, so each IP and each wallet gets a daily budget,
   // and a smaller one for the Partner tier, whose model costs far more.
   const who = [`ip:${ipOf(req)}`, ...(s.account ? [`acct:${s.account}`] : [])];
@@ -83,11 +90,6 @@ export async function POST(req: Request) {
     return Response.json({ error: `You've reached today's limit of ${CHAT_PER_DAY} messages. It resets at 00:00 UTC.` }, { status: 429 });
   }
   const { id, think, pane, tier } = body.data;
-  const message = body.data.message as unknown as UIMessage;
-  const text = titleFrom(message);
-  if (JSON.stringify(message.parts).length > MAX_INPUT * 2 || text.length === 0) {
-    return Response.json({ error: "Message is empty or too long." }, { status: 400 });
-  }
 
   try {
     ensureConversation(id, ownerOf(s), text);
@@ -135,12 +137,9 @@ export async function POST(req: Request) {
     timeout: { totalMs: 240_000, toolMs: 60_000 },
     maxRetries: 1,
     // One line per reply, so the real cost per message can be read from the logs. No account or text.
-    onEnd: ({ stepNumber, finishReason, totalUsage: u }) => {
-      console.log(
-        "chat usage",
-        JSON.stringify({ tier: llm.tier ?? null, model: llm.id, think: Boolean(think), steps: stepNumber + 1, finish: finishReason, in: u.inputTokens, cached: u.inputTokenDetails?.cacheReadTokens, out: u.outputTokens, reasoning: u.outputTokenDetails?.reasoningTokens }),
-      );
-    },
+    onEnd: ({ stepNumber, finishReason, totalUsage }) => logUsage(llm, Boolean(think), stepNumber + 1, finishReason, [totalUsage]),
+    // Stopped or timed out: the steps that finished were still paid for.
+    onAbort: ({ steps }) => logUsage(llm, Boolean(think), steps.length, "aborted", steps.map((x) => x.usage)),
   });
 
   return createUIMessageStreamResponse({
@@ -163,6 +162,25 @@ export async function POST(req: Request) {
       },
     }),
   });
+}
+
+/** One "chat usage" log line per reply: tokens summed over its steps. No account, IP or text. */
+function logUsage(llm: { tier?: string; id: string }, think: boolean, steps: number, finish: string, usage: LanguageModelUsage[]) {
+  const sum = (f: (u: LanguageModelUsage) => number | undefined) => usage.reduce((n, u) => n + (f(u) ?? 0), 0);
+  console.log(
+    "chat usage",
+    JSON.stringify({
+      tier: llm.tier ?? null,
+      model: llm.id,
+      think,
+      steps,
+      finish,
+      in: sum((u) => u.inputTokens),
+      cached: sum((u) => u.inputTokenDetails?.cacheReadTokens),
+      out: sum((u) => u.outputTokens),
+      reasoning: sum((u) => u.outputTokenDetails?.reasoningTokens),
+    }),
+  );
 }
 
 /** The last HISTORY messages, then the oldest dropped until they fit HISTORY_CHARS. The newest always stays. */

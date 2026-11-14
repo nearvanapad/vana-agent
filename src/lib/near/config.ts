@@ -1,6 +1,6 @@
 import { WALLET } from "./network";
 
-/** The network the wallet signs on: testnet unless the build says mainnet. */
+/** The network the wallet signs on: the visitor's pick, else mainnet unless the build says testnet. */
 export const NETWORK = WALLET.id;
 
 export const RPC_URL = WALLET.rpc[0]!;
