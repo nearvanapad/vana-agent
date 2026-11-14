@@ -10,14 +10,14 @@ import {
 } from "ai";
 import { z } from "zod";
 import { Guard } from "@/lib/agent/guard";
-import { chatModel, llmConfigured, TIER_IDS } from "@/lib/agent/model";
+import { chatModel, DEFAULT_TIER, llmConfigured, TIER_IDS, TIERS } from "@/lib/agent/model";
 import { capturingFetch, markPending, VERIFY, verifyReply, type Call } from "@/lib/agent/verify";
 import { instructions } from "@/lib/agent/prompt";
 import { buildTools } from "@/lib/agent/tools";
 import { ownerOf, readSession } from "@/lib/auth/session";
 import { CONVERSATION_ID, ensureConversation, loadMessages, NotYours, saveMessages, titleFrom } from "@/lib/chat/store";
 import { allow, allowToday, ipOf } from "@/lib/chat/rate-limit";
-import { CHAT_PER_DAY } from "@/lib/chat/limits";
+import { CHAT_PER_DAY, PARTNER_PER_DAY } from "@/lib/chat/limits";
 import { access, denied } from "@/lib/gate/access";
 import { crossSite } from "@/lib/http/same-site";
 
@@ -45,6 +45,13 @@ const Body = z.object({
 const MAX_INPUT = 4000;
 /** Earlier messages sent to the model; older ones stay stored but are left out. */
 const HISTORY = 30;
+/**
+ * And at most this many characters of them (about 30k tokens), oldest dropped first: every step
+ * of a reply sends the history again. The new message always goes.
+ */
+const HISTORY_CHARS = 120_000;
+/** Output tokens per step, reasoning included. Far above what replies use; it stops a runaway. */
+const MAX_OUTPUT = { normal: 8_192, think: 16_384 };
 
 export async function POST(req: Request) {
   const refused = crossSite(req);
@@ -58,8 +65,21 @@ export async function POST(req: Request) {
 
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) return Response.json({ error: "Bad request." }, { status: 400 });
-  // Chat is free for any signed-in wallet for now, so each IP and each wallet gets a daily budget.
-  if (!allowToday([`ip:${ipOf(req)}`, ...(s.account ? [`acct:${s.account}`] : [])])) {
+  // Chat is free for any signed-in wallet for now, so each IP and each wallet gets a daily budget,
+  // and a smaller one for the Partner tier, whose model costs far more.
+  const who = [`ip:${ipOf(req)}`, ...(s.account ? [`acct:${s.account}`] : [])];
+  const partner = TIERS !== null && (body.data.tier ?? DEFAULT_TIER) === "partner";
+  const full = allowToday([
+    ...who.map((key) => ({ key, cap: CHAT_PER_DAY })),
+    ...(partner ? who.map((key) => ({ key: `partner:${key}`, cap: PARTNER_PER_DAY })) : []),
+  ]);
+  if (full?.startsWith("partner:")) {
+    return Response.json(
+      { error: `You've used today's ${PARTNER_PER_DAY} Partner messages. Switch to Private or Incognito to keep going; Partner resets at 00:00 UTC.` },
+      { status: 429 },
+    );
+  }
+  if (full) {
     return Response.json({ error: `You've reached today's limit of ${CHAT_PER_DAY} messages. It resets at 00:00 UTC.` }, { status: 429 });
   }
   const { id, think, pane, tier } = body.data;
@@ -104,15 +124,23 @@ export async function POST(req: Request) {
   const result = streamText({
     model: llm.model,
     instructions: instructions({ account: s.account, now: new Date(), canSwap: Boolean(s.account), pane, network: s.network.id }),
-    messages: await convertToModelMessages(messages.slice(-HISTORY), { tools, ignoreIncompleteToolCalls: true }),
+    messages: await convertToModelMessages(recent(messages), { tools, ignoreIncompleteToolCalls: true }),
     tools,
     stopWhen: isStepCount(8),
+    maxOutputTokens: think ? MAX_OUTPUT.think : MAX_OUTPUT.normal,
     prepareStep: () => ({ activeTools: guard.active(names) }),
     // Normal mode answers from tool results and should be quick; Think mode takes its time.
     ...(llm.reasoning ? { reasoning: llm.reasoning } : {}),
     abortSignal: req.signal,
     timeout: { totalMs: 240_000, toolMs: 60_000 },
     maxRetries: 1,
+    // One line per reply, so the real cost per message can be read from the logs. No account or text.
+    onEnd: ({ stepNumber, finishReason, totalUsage: u }) => {
+      console.log(
+        "chat usage",
+        JSON.stringify({ tier: llm.tier ?? null, model: llm.id, think: Boolean(think), steps: stepNumber + 1, finish: finishReason, in: u.inputTokens, cached: u.inputTokenDetails?.cacheReadTokens, out: u.outputTokens, reasoning: u.outputTokenDetails?.reasoningTokens }),
+      );
+    },
   });
 
   return createUIMessageStreamResponse({
@@ -135,6 +163,14 @@ export async function POST(req: Request) {
       },
     }),
   });
+}
+
+/** The last HISTORY messages, then the oldest dropped until they fit HISTORY_CHARS. The newest always stays. */
+function recent(messages: UIMessage[]): UIMessage[] {
+  const kept = messages.slice(-HISTORY);
+  let size = kept.reduce((n, m) => n + JSON.stringify(m.parts).length, 0);
+  while (kept.length > 1 && size > HISTORY_CHARS) size -= JSON.stringify(kept.shift()!.parts).length;
+  return kept;
 }
 
 function friendly(e: unknown): string {

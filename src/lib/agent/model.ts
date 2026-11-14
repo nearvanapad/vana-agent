@@ -1,5 +1,6 @@
 import { createOpenAI } from "@ai-sdk/openai";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { PARTNER_PER_DAY } from "../chat/limits";
 
 /**
  * The chat model. OpenAI itself is reached through its Responses API, the one that allows a
@@ -50,7 +51,7 @@ const DEFAULTS: Record<Tier, Omit<TierInfo, "id">> = {
   },
   partner: {
     label: "Partner",
-    hint: "Bigger model on a partner's secure hardware. Costs more.",
+    hint: `Bigger model on a partner's secure hardware. Costs more, so ${PARTNER_PER_DAY} messages a day.`,
     model: "z-ai/glm-5.3",
     think: "z-ai/glm-5.3",
   },

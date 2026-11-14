@@ -23,7 +23,7 @@ import { EYEBROW, QUIET, STICKER } from "@/components/ui/styles";
 import { Mascot, type Mood } from "@/components/vana/mascot";
 import { stranger } from "@/lib/agent/guard";
 import { GATE_SYMBOL } from "@/lib/gate/config";
-import { CHAT_PER_DAY } from "@/lib/chat/limits";
+import { CHAT_PER_DAY, PARTNER_PER_DAY } from "@/lib/chat/limits";
 import vana from "../chat/vana.gif";
 
 /*
@@ -1390,7 +1390,7 @@ const SPEC_ACCESS = (
       ["how", "NEP-413 signed message, full-access key checked"],
       ["on chain", "Nothing"],
       ["gate", `Signed-in wallet to chat. No ${GATE_SYMBOL} needed for now. Swaps open`],
-      ["limit", `${CHAT_PER_DAY} messages a day per IP and per wallet`],
+      ["limit", `${CHAT_PER_DAY} messages a day per IP and per wallet, ${PARTNER_PER_DAY} of them on Partner`],
     ]}
     files={["src/lib/auth/nep413.ts", "src/lib/gate/access.ts", "src/lib/gate/config.ts"]}
   />
