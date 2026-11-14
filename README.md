@@ -42,6 +42,7 @@ NEAR Intents has no testnet, so what works depends on the network picked in the 
 Safeguards:
 - **The AI only reads.** Transactions are built from the stored proposal, never from model output.
 - **Prompt-injection guard:** once a request reads stranger-written text (token names, symbols), the swap tool is off for the rest of that request (`src/lib/agent/guard.ts`).
+- **No deposit before the account can receive.** A swap paid from another chain into a NEAR token shows its deposit address only after the user's own wallet has registered the account on that token. An account without the NEAR to pay that registration, or one not on chain yet, is refused up front with how much NEAR to add. The server holds no keys and never pays it (`src/lib/swap/setup.ts`).
 - **Web Search results** are shown as quotes and never fed to the agent.
 
 Libraries: Next.js, React, the Vercel AI SDK, `@nearai/inference-sdk`, `@hot-labs/near-connect` (wallet connect), `near-api-js`, `@noble/curves` and `@noble/hashes` (Ethereum sign-in), TanStack Query, Radix UI, Tailwind CSS, zod, better-sqlite3. No starter template.
