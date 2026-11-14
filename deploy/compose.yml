@@ -1,4 +1,4 @@
-# The stack on the server (~/apps/vana-agent), put there by deploy/ship.sh. No source and no build
+# The stack on the server (~/apps/vana-agent), copied there at deploy. No source and no build
 # on the server: the image is built on a developer machine and pulled from ghcr.io. Secrets come from
 # .env next to this file (deploy/env.example). The way in is nearvana's Caddy, which reaches the app
 # as vana-agent:3000 on the shared nearvana_default network and serves it on vana.nearvana.trade.
@@ -6,7 +6,7 @@ name: vana-agent
 
 services:
   app:
-    image: ${IMAGE:?set by deploy/ship.sh}
+    image: ${IMAGE:?set IMAGE in .env}
     container_name: vana-agent
     env_file: .env
     environment:

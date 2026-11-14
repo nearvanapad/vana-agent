@@ -84,7 +84,7 @@ Our fee is set server-side only. For 1Click it is `INTENTS_FEE_BPS` and `INTENTS
 
 ## Deploy
 
-Live at https://vana.nearvana.trade. `deploy/ship.sh` builds HEAD for linux/amd64, pushes it to `ghcr.io/nearvanapad/vana-agent` and runs it on the server, rolling back if it doesn't come up healthy. `TAG=<sha> deploy/ship.sh` redeploys an older image. Secrets live in the server's `.env` (see `deploy/env.example`); public build values in `deploy/build.env`.
+Live at https://vana.nearvana.trade. Images are built for linux/amd64 and pushed to `ghcr.io/nearvanapad/vana-agent`, tagged with the commit; the server runs one with `deploy/compose.yml`. Secrets live in the server's `.env` (see `deploy/env.example`); public build values in `deploy/build.env`.
 
 ## Data sources
 
