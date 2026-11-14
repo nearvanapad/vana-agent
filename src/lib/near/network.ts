@@ -64,10 +64,10 @@ export const TESTNET: Network = {
 
 /**
  * The network the wallet signs on until the visitor picks one, set at build time with
- * NEXT_PUBLIC_NEAR_NETWORK. Testnet by default: swaps there go through Rhea's testnet pools
+ * NEXT_PUBLIC_NEAR_NETWORK. Mainnet by default; set it to testnet to start on Rhea's testnet pools
  * (NEAR Intents is mainnet only).
  */
-export const DEFAULT_WALLET: Network = process.env.NEXT_PUBLIC_NEAR_NETWORK === "mainnet" ? MAINNET : TESTNET;
+export const DEFAULT_WALLET: Network = process.env.NEXT_PUBLIC_NEAR_NETWORK === "testnet" ? TESTNET : MAINNET;
 
 /** The visitor's pick, in a cookie the server reads too. Switching reloads the app. */
 export const NET_COOKIE = "vana_net";

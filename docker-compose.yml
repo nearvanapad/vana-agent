@@ -5,7 +5,7 @@ services:
       args:
         NEXT_PUBLIC_NEAR_RPC_URL: ${NEXT_PUBLIC_NEAR_RPC_URL:-https://rpc.mainnet.fastnear.com}
         NEXT_PUBLIC_DEMO_TOKEN: ${NEXT_PUBLIC_DEMO_TOKEN:-}
-        NEXT_PUBLIC_NEAR_NETWORK: ${NEXT_PUBLIC_NEAR_NETWORK:-testnet}
+        NEXT_PUBLIC_NEAR_NETWORK: ${NEXT_PUBLIC_NEAR_NETWORK:-mainnet}
     env_file: .env
     environment:
       DATABASE_PATH: /data/vana.db

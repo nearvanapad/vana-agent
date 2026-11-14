@@ -80,6 +80,10 @@ const MIGRATIONS = [
      n INTEGER NOT NULL,
      PRIMARY KEY (key, day)
    );`,
+  // The default network moved from testnet to mainnet. Rows still NULL were made on a testnet
+  // build, so they say so now rather than follow the new default.
+  `UPDATE sessions SET network = 'testnet' WHERE network IS NULL;
+   UPDATE swaps SET network = 'testnet' WHERE network IS NULL;`,
 ];
 
 let db: Database.Database | null = null;
