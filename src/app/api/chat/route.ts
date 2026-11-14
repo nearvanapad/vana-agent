@@ -21,6 +21,10 @@ import { allow, allowToday, ipOf } from "@/lib/chat/rate-limit";
 import { CHAT_PER_DAY, IP_CHAT_PER_DAY, IP_PARTNER_PER_DAY, PARTNER_PER_DAY, type Budget } from "@/lib/chat/limits";
 import { access, denied } from "@/lib/gate/access";
 import { crossSite } from "@/lib/http/same-site";
+import { AccountNotFound } from "@/lib/agent/profile";
+import { TokenNotFound } from "@/lib/risk/contract";
+import { WebCapError } from "@/lib/risk/web";
+import { SwapError } from "@/lib/swap/assets";
 
 const Id = z.string().max(120).regex(/^[A-Za-z0-9._:-]+$/);
 const Body = z.object({
@@ -200,7 +204,11 @@ function recent(messages: UIMessage[]): UIMessage[] {
   return kept;
 }
 
+/** Errors written for the user (a made-up contract, an expired quote): their text is shown as is. */
+const FOR_USER = [SwapError, TokenNotFound, AccountNotFound, WebCapError];
+
 function friendly(e: unknown): string {
+  if (FOR_USER.some((C) => e instanceof C)) return (e as Error).message;
   const msg = e instanceof Error ? e.message : String(e);
   if (/401|unauthor|api key/i.test(msg)) return "The AI model rejected the server's API key.";
   if (/429|rate/i.test(msg)) return "The AI model is rate-limited right now. Try again in a minute.";
